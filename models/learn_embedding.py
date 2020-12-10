@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
+import os
+import sys
+sys.setrecursionlimit(100000)
 import joblib
 import numpy as np
+import pandas as pd
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer
@@ -11,16 +15,18 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
 from sklearn.impute import SimpleImputer
 from sklearn.compose import TransformedTargetRegressor
+from settings import data_dir
+
+
+experiment="Contrastive-LpDistance32"
+experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 
 
 
 
 
-
-
-
-classifier_embedding,test_embedding,train,test=joblib.load("embedding_training_data.joblib")
+classifier_embedding,test_embedding,train,test=joblib.load(experiment_file)
 
 
 
