@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import os
 import sys
-sys.setrecursionlimit(100000)
+# sys.setrecursionlimit(100000)
 import joblib
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ from sklearn.compose import TransformedTargetRegressor
 from settings import data_dir
 
 
-experiment="Contrastive-LpDistance32"
+experiment="Contrastive-DotProduct32"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 
@@ -56,9 +56,9 @@ pipeline_resp=Pipeline([
     ('clf',TransformedTargetRegressor(regressor=base_clf_resp,transformer=q_transformer)),
 ])
 
-clf_resp=GridSearchCV(pipeline_resp,param_grid=tuned_parameters_resp,
+clf_resp=RandomizedSearchCV(pipeline_resp,param_distributions=tuned_parameters_resp,
                             cv=KFold(10,shuffle=False),
-                 verbose=1,n_jobs=60,
+                 verbose=1,n_jobs=60,n_iter=10,
                  scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],refit='neg_root_mean_squared_error')
 # clf_resp.fit(classifier_embedding[~train['resp_rate'].isna()],train.loc[~train['resp_rate'].isna(),'resp_rate'])
 clf_resp.fit(classifier_embedding[~train['resp_rate'].isna()],y_train[~train['resp_rate'].isna()])
