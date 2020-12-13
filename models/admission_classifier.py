@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import os
+import json
 import sys
 import multiprocessing
 
@@ -16,12 +17,14 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
-from settings import data_dir
+from settings import data_dir,weights_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-LpDistance32"
+experiment="Contrastive-DotProduct32"
+weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 
@@ -33,6 +36,8 @@ classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['
 test_embedding_reduced=np.stack(map(lambda id:test_embedding[test['id']==id,:].mean(axis=0) ,test_ids))
 admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[0],train_ids))
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
+
+
 # base_clf=SGDClassifier(loss='log',class_weight='balanced',penalty='l2',
 #                        early_stopping=True,n_iter_no_change=10,max_iter=100000)
 #
@@ -78,7 +83,7 @@ pipeline=Pipeline([
 
 clf = RandomizedSearchCV(pipeline, param_distributions=tuned_parameters, cv=StratifiedKFold(10, ),
                    verbose=1, n_jobs=cores,n_iter=50,
-                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='balanced_accuracy',
+                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
 # clf.fit(classifier_embedding,train['admitted'])
@@ -87,7 +92,7 @@ clf.fit(classifier_embedding_reduced,admitted_train)
 
 
 cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_results_['mean_test_roc_auc'],
-              'f1':clf.cv_results_['mean_test_f1'],'recall':clf.cv_results_['mean_test_recall'],
+              'acc':clf.cv_results_['mean_test_balanced_accuracy'],'recall':clf.cv_results_['mean_test_recall'],
                           'precision':clf.cv_results_['mean_test_precision']})
 print(cv_results)
 
@@ -104,4 +109,15 @@ print(classification_report(final_predictions2['admitted'],(final_predictions2['
 
 print("AUC: %.2f" % roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction']))
 
+report=classification_report(final_predictions2['admitted'],(final_predictions2['prediction']>0.5)*1.0,output_dict=True)
+recall=report['1.0']['recall']
+precision=report['1.0']['precision']
+f1=report['1.0']['f1-score']
+specificity=report['0.0']['recall']
+acc=report['accuracy']
+auc=roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction'])
+save_table3(model="Contrastive",precision=precision,recall=recall,specificity=specificity,
+            auc=auc,details=experiment,other=json.dumps({'host':os.uname()[1],'f1':f1,
+                                                       'acc':acc}))
 
+joblib.dump(clf,weights_file)
