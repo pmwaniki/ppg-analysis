@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import os
 import sys
+import multiprocessing
 
 import joblib
 import numpy as np
@@ -20,7 +21,7 @@ from settings import data_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-
+cores=multiprocessing.cpu_count()-2
 experiment="Contrastive-LpDistance32"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -71,7 +72,7 @@ pipeline=Pipeline([
 ])
 
 clf = RandomizedSearchCV(pipeline, param_distributions=tuned_parameters, cv=StratifiedKFold(10, ),
-                   verbose=1, n_jobs=10,n_iter=50,
+                   verbose=1, n_jobs=cores,n_iter=50,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='balanced_accuracy',
                    return_train_score=True,
                    )
