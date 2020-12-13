@@ -27,6 +27,12 @@ experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 classifier_embedding,test_embedding,train,test=joblib.load(experiment_file)
 
+train_ids=train['id'].unique()
+test_ids=test['id'].unique()
+classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['id']==id,:].mean(axis=0) ,train_ids))
+test_embedding_reduced=np.stack(map(lambda id:test_embedding[test['id']==id,:].mean(axis=0) ,test_ids))
+admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[0],train_ids))
+admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 # base_clf=SGDClassifier(loss='log',class_weight='balanced',penalty='l2',
 #                        early_stopping=True,n_iter_no_change=10,max_iter=100000)
 #
@@ -53,7 +59,7 @@ classifier_embedding,test_embedding,train,test=joblib.load(experiment_file)
 #
 # }
 
-base_clf=SVC(probability=False,class_weight='balanced')
+base_clf=SVC(probability=True,class_weight='balanced')
 tuned_parameters = [
     {'clf__kernel': ['rbf'], 'clf__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1],
 #                      'pca__n_components':[int(64/2**i) for i in range(5)],
@@ -75,7 +81,8 @@ clf = RandomizedSearchCV(pipeline, param_distributions=tuned_parameters, cv=Stra
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='balanced_accuracy',
                    return_train_score=True,
                    )
-results=clf.fit(classifier_embedding,train['admitted'])
+# clf.fit(classifier_embedding,train['admitted'])
+clf.fit(classifier_embedding_reduced,admitted_train)
 
 
 
