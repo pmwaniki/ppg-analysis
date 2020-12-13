@@ -23,7 +23,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-DotProduct32"
+experiment="Contrastive-DotProduct"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -38,18 +38,18 @@ admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 
 
-# base_clf=SGDClassifier(loss='log',class_weight='balanced',penalty='l2',
-#                        early_stopping=True,n_iter_no_change=10,max_iter=100000)
-#
-#
-# tuned_parameters = {
-#     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-#     'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__learning_rate': ['constant', 'adaptive', 'invscaling'],
-#     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
-#
-# }
+base_clf=SGDClassifier(loss='modified_huber',class_weight='balanced',penalty='l2',
+                       early_stopping=True,n_iter_no_change=10,max_iter=100000)
+
+
+tuned_parameters = {
+    # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
+    'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
+    'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
+    'clf__learning_rate': ['constant', 'adaptive', 'invscaling'],
+    # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
+
+}
 
 #
 # base_clf=MLPClassifier(hidden_layer_sizes=(100,100,100,100,100),
@@ -64,16 +64,16 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #
 # }
 
-base_clf=SVC(probability=True,class_weight='balanced')
-tuned_parameters = [
-    {'clf__kernel': ['rbf'], 'clf__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1],
-#                      'pca__n_components':[int(64/2**i) for i in range(5)],
-     'clf__C': [1, 10, 100, 1000,1e4]
-    },
-                    {'clf__kernel': ['linear'], 'clf__C': [1, 10, 100, 1000],
-#                      'pca__n_components':[int(64/2**i) for i in range(5)],
-                    },
-                   ]
+# base_clf=SVC(probability=True,class_weight='balanced')
+# tuned_parameters = [
+#     {'clf__kernel': ['rbf'], 'clf__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1],
+# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
+#      'clf__C': [1, 10, 100, 1000,1e4]
+#     },
+#                     {'clf__kernel': ['linear'], 'clf__C': [1, 10, 100, 1000],
+# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
+#                     },
+#                    ]
 
 pipeline=Pipeline([
     ('scl',RobustScaler()),
@@ -82,12 +82,12 @@ pipeline=Pipeline([
 ])
 
 clf = RandomizedSearchCV(pipeline, param_distributions=tuned_parameters, cv=StratifiedKFold(10, ),
-                   verbose=1, n_jobs=cores,n_iter=50,
+                   verbose=1, n_jobs=cores,n_iter=5000,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
-# clf.fit(classifier_embedding,train['admitted'])
-clf.fit(classifier_embedding_reduced,admitted_train)
+clf.fit(classifier_embedding,train['admitted'])
+# clf.fit(classifier_embedding_reduced,admitted_train)
 
 
 
