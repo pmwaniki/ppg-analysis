@@ -7,7 +7,6 @@ import joblib
 import numpy as np
 import pandas as pd
 import scipy
-import torch
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler
