@@ -3,11 +3,15 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
+import numpy as np
 
 
 
 
 triage_data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
+train_ids,test_ids=joblib.load(os.path.join(data_dir,"triage/ids.joblib"))
+triage_data=triage_data[triage_data['Study No'].isin(np.concatenate([test_ids,train_ids]))]
 
 sns.scatterplot(x='Oxygen saturation',y='Heart rate(HR) ',
                 hue='Was child admitted (this illness)?', alpha=.5,data=triage_data)
