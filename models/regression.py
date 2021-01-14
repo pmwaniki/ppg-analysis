@@ -46,12 +46,13 @@ q_transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000)
 
 pipeline_hr=Pipeline([
     ('scl',RobustScaler()),
-#     ('pca',PCA()),
+    ('pca',PCA()),
     ('clf',TransformedTargetRegressor(regressor=KNeighborsRegressor(weights='distance',metric=dist_fun,),
                                       transformer=q_transformer)),
 ])
-hr_grid={'clf__regressor__n_neighbors':[1,3,5,10,15,30,50],
-         'clf__regressor__weights':['distance','uniform']}
+hr_grid={'clf__regressor__n_neighbors':[1,3,5,10,15,30,50,100,300],
+         'clf__regressor__weights':['distance'],
+                'pca__n_components':[2,4,8,16,32]}
 hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
                     refit='neg_root_mean_squared_error')
@@ -59,7 +60,7 @@ hr_clf.fit(classifier_embedding[train.hr!=0,:],train.loc[train.hr!=0,'hr'])
 
 cv_results_hr=pd.DataFrame({'params':hr_clf.cv_results_['params'],
                               'rmse':hr_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
-              'R2':hr_clf.cv_results_['mean_test_explained_variance'],
+              'R2':hr_clf.cv_results_['mean_test_r2'],
                               'max_error':hr_clf.cv_results_['mean_test_max_error'],
                           # 'precision':clf.cv_results_['mean_test_precision']
                               })
@@ -81,20 +82,21 @@ plt.show()
 #spo2
 pipeline_spo2=Pipeline([
     ('scl',RobustScaler()),
-#     ('pca',PCA()),
+    ('pca',PCA()),
     ('clf',TransformedTargetRegressor(regressor=KNeighborsRegressor(metric=dist_fun,),
                                       transformer=q_transformer)),
 ])
-spo2_grid={'clf__regressor__n_neighbors':[1,3,5,10,15,30,50,100],
-           'clf__regressor__weights':['distance','uniform'],}
+spo2_grid={'clf__regressor__n_neighbors':[1,3,5,10,15,30,50,100,300],
+         'clf__regressor__weights':['distance'],
+                'pca__n_components':[2,4,8,16,32]}
 spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='neg_root_mean_squared_error')
+                    refit='r2')
 spo2_clf.fit(classifier_embedding[train.spo2>=75,:],train.loc[train.spo2>=75,'spo2'])
 
 cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
                               'rmse':spo2_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
-              'R2':spo2_clf.cv_results_['mean_test_explained_variance'],
+              'R2':spo2_clf.cv_results_['mean_test_r2'],
                               'max_error':spo2_clf.cv_results_['mean_test_max_error'],
                           # 'precision':clf.cv_results_['mean_test_precision']
                               })
@@ -107,6 +109,43 @@ rmse=mean_squared_error(test.loc[test['spo2'] !=0,'spo2'],test_pred_spo2[test['s
 fig2,ax2=plt.subplots(1)
 ax2.scatter(test.loc[test['spo2'] >=75,'spo2'],test_pred_spo2[test['spo2'] >=75 ])
 ax2.plot([75,100],[75,100],'r--')
+ax2.set_xlabel("Observed")
+ax2.set_ylabel("Predicted")
+fig2.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_resp_rate_{os.uname()[1]}_{experiment}.png")
+plt.show()
+
+
+#resp rate
+pipeline_resp_rate=Pipeline([
+    ('scl',RobustScaler()),
+    ('pca',PCA()),
+    ('clf',TransformedTargetRegressor(regressor=KNeighborsRegressor(weights='distance',metric=dist_fun,),
+                                      transformer=QuantileTransformer(output_distribution="normal",
+                                                                      n_quantiles=1000))),
+])
+resp_rate_grid={'clf__regressor__n_neighbors':[1,3,5,10,15,30,50,100,300],
+         'clf__regressor__weights':['distance'],
+                'pca__n_components':[2,4,8,16,32]}
+resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10),n_jobs=cores,
+                    scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
+                    refit='neg_root_mean_squared_error')
+resp_rate_clf.fit(classifier_embedding[~train.resp_rate.isna(),:],train.loc[~train.resp_rate.isna(),'resp_rate'])
+
+cv_results_resp_rate=pd.DataFrame({'params':resp_rate_clf.cv_results_['params'],
+                              'rmse':resp_rate_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
+              'R2':resp_rate_clf.cv_results_['mean_test_r2'],
+                              'max_error':resp_rate_clf.cv_results_['mean_test_max_error'],
+                          # 'precision':clf.cv_results_['mean_test_precision']
+                              })
+print(cv_results_resp_rate)
+
+test_pred_resp_rate=resp_rate_clf.predict(test_embedding)
+r2=r2_score(test.loc[~train.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~train.resp_rate.isna() ])
+rmse=mean_squared_error(test.loc[~train.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~train.resp_rate.isna() ],squared=False)
+
+fig2,ax2=plt.subplots(1)
+ax2.scatter(test.loc[~test.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~test.resp_rate.isna() ])
+ax2.plot([20,100],[20,100],'r--')
 ax2.set_xlabel("Observed")
 ax2.set_ylabel("Predicted")
 fig2.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_resp_rate_{os.uname()[1]}_{experiment}.png")
