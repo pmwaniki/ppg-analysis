@@ -35,13 +35,16 @@ classifier_embedding,test_embedding,train,test=joblib.load(experiment_file)
 
 train_ids=train['id'].unique()
 test_ids=test['id'].unique()
-# classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['id']==id,:].mean(axis=0) ,train_ids))
-# test_embedding_reduced=np.stack(map(lambda id:test_embedding[test['id']==id,:].mean(axis=0) ,test_ids))
+classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['id']==id,:].mean(axis=0) ,train_ids))
+test_embedding_reduced=np.stack(map(lambda id:test_embedding[test['id']==id,:].mean(axis=0) ,test_ids))
 # admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[0],train_ids))
 # admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 #
-# hr_train=np.stack(map(lambda id:train.loc[train['id']==id,'hr'].iat[0],train_ids))
-# hr_test=np.stack(map(lambda id:test.loc[test['id']==id,'hr'].iat[0],test_ids))
+hr_train=np.stack(map(lambda id:train.loc[train['id']==id,'hr'].median(skipna=True),train_ids))
+hr_test=np.stack(map(lambda id:test.loc[test['id']==id,'hr'].median(skipna=True),test_ids))
+
+resp_rate_train=np.stack(map(lambda id:train.loc[train['id']==id,'resp_rate'].median(skipna=True),train_ids))
+resp_rate_test=np.stack(map(lambda id:test.loc[test['id']==id,'resp_rate'].median(skipna=True),test_ids))
 
 q_transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000)
 # regressor=KNeighborsRegressor(weights='distance',metric=dist_fun,)
@@ -146,7 +149,7 @@ rmse=mean_squared_error(test.loc[test['spo2'] !=0,'spo2'],test_pred_spo2[test['s
 
 
 #resp rate
-regressor=SGDRegressor(loss='huber',max_iter=10000,early_stopping=True)
+regressor=SGDRegressor(loss='squared_loss',max_iter=50000,early_stopping=True)
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
     ('scl',RobustScaler()),
@@ -154,19 +157,20 @@ pipeline_resp_rate=Pipeline([
     ('poly',PolynomialFeatures()),
 # ('scl',RobustScaler()),
     ('clf',TransformedTargetRegressor(regressor=regressor,
-                                      # transformer=QuantileTransformer(output_distribution="normal", n_quantiles=1000),
-                                      func=lambda x:np.log(x),inverse_func=lambda x:np.exp(x),
+                                      transformer=QuantileTransformer(output_distribution="normal", n_quantiles=500),
+                                      # func=lambda x:x,inverse_func=lambda x:x,
                                       )),
 ])
-resp_rate_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0],
-                'clf__regressor__eta0':[0.001,0.01,0.1],
+resp_rate_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
+                'clf__regressor__eta0':[0.001,0.01,0.1,1.0,5.0],
+                'clf__transformer__n_quantiles':[50,150,200,300,500,700],
                 # 'pca__n_components':[2,4,8,16,32],
-                'poly__degree':[2,3,],
+                'poly__degree':[2,],
                 }
 resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='neg_root_mean_squared_error')
-resp_rate_clf.fit(classifier_embedding[~train.resp_rate.isna(),:],train.loc[~train.resp_rate.isna(),'resp_rate'])
+                    refit='r2')
+resp_rate_clf.fit(classifier_embedding_reduced[~np.isnan(resp_rate_train),:],resp_rate_train[~np.isnan(resp_rate_train)])
 
 cv_results_resp_rate=pd.DataFrame({'params':resp_rate_clf.cv_results_['params'],
                               'rmse':resp_rate_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
@@ -176,12 +180,12 @@ cv_results_resp_rate=pd.DataFrame({'params':resp_rate_clf.cv_results_['params'],
                               })
 print(cv_results_resp_rate)
 
-test_pred_resp_rate=resp_rate_clf.predict(test_embedding)
-r2=r2_score(test.loc[~test.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~test.resp_rate.isna() ])
-rmse=mean_squared_error(test.loc[~test.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~test.resp_rate.isna() ],squared=False)
+test_pred_resp_rate=resp_rate_clf.predict(test_embedding_reduced)
+r2=r2_score(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
+rmse=mean_squared_error(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)],squared=False)
 
 fig2,ax2=plt.subplots(1)
-ax2.scatter(test.loc[~test.resp_rate.isna(),'resp_rate'],test_pred_resp_rate[~test.resp_rate.isna() ])
+ax2.scatter(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
 ax2.plot([20,100],[20,100],'r--')
 ax2.set_xlabel("Observed")
 ax2.set_ylabel("Predicted")
