@@ -26,7 +26,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-DotProduct32"
+experiment="Contrastive-augment-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
@@ -45,6 +45,9 @@ hr_test=np.stack(map(lambda id:test.loc[test['id']==id,'hr'].median(skipna=True)
 
 resp_rate_train=np.stack(map(lambda id:train.loc[train['id']==id,'resp_rate'].median(skipna=True),train_ids))
 resp_rate_test=np.stack(map(lambda id:test.loc[test['id']==id,'resp_rate'].median(skipna=True),test_ids))
+
+spo2_train=np.stack(map(lambda id:train.loc[train['id']==id,'spo2'].median(skipna=True),train_ids))
+spo2_test=np.stack(map(lambda id:test.loc[test['id']==id,'spo2'].median(skipna=True),test_ids))
 
 q_transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000)
 # regressor=KNeighborsRegressor(weights='distance',metric=dist_fun,)
@@ -149,7 +152,7 @@ rmse=mean_squared_error(test.loc[test['spo2'] !=0,'spo2'],test_pred_spo2[test['s
 
 
 #resp rate
-regressor=SGDRegressor(loss='squared_loss',max_iter=50000,early_stopping=True)
+regressor=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True)
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
     ('scl',RobustScaler()),
@@ -162,10 +165,10 @@ pipeline_resp_rate=Pipeline([
                                       )),
 ])
 resp_rate_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
-                'clf__regressor__eta0':[0.001,0.01,0.1,1.0,5.0],
-                'clf__transformer__n_quantiles':[50,150,200,300,500,700],
+                'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
+                'clf__transformer__n_quantiles':[200,300,500,700,900],
                 # 'pca__n_components':[2,4,8,16,32],
-                'poly__degree':[2,],
+                'poly__degree':[2,3],
                 }
 resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
@@ -187,6 +190,51 @@ rmse=mean_squared_error(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp
 fig2,ax2=plt.subplots(1)
 ax2.scatter(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
 ax2.plot([20,100],[20,100],'r--')
+ax2.set_xlabel("Observed")
+ax2.set_ylabel("Predicted")
+# fig2.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_resp_rate_{os.uname()[1]}_{experiment}.png")
+plt.show()
+
+
+#spo2
+regressor=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True)
+# regressor=Lasso(max_iter=50000)
+pipeline_spo2=Pipeline([
+    ('scl',RobustScaler()),
+    # ('pca',PCA()),
+    ('poly',PolynomialFeatures()),
+# ('scl',RobustScaler()),
+    ('clf',TransformedTargetRegressor(regressor=regressor,
+                                      # transformer=QuantileTransformer(output_distribution="normal", n_quantiles=500),
+                                      func=lambda x:x,inverse_func=lambda x:x,
+                                      )),
+])
+spo2_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
+                'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
+                # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
+                # 'pca__n_components':[2,4,8,16,32],
+                'poly__degree':[2,3],
+                }
+spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10),n_jobs=cores,
+                    scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
+                    refit='r2')
+spo2_clf.fit(classifier_embedding_reduced[spo2_train>70,:],spo2_train[spo2_train>70])
+
+cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
+                              'rmse':spo2_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
+              'R2':spo2_clf.cv_results_['mean_test_r2'],
+                              'max_error':spo2_clf.cv_results_['mean_test_max_error'],
+                          # 'precision':clf.cv_results_['mean_test_precision']
+                              })
+print(cv_results_spo2)
+
+test_pred_spo2=spo2_clf.predict(test_embedding_reduced)
+r2=r2_score(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
+rmse=mean_squared_error(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70],squared=False)
+
+fig2,ax2=plt.subplots(1)
+ax2.scatter(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
+ax2.plot([70,100],[70,100],'r--')
 ax2.set_xlabel("Observed")
 ax2.set_ylabel("Predicted")
 # fig2.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_resp_rate_{os.uname()[1]}_{experiment}.png")
