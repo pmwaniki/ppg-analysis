@@ -43,6 +43,7 @@ base_clf=SGDClassifier(loss='modified_huber',
                        # class_weight='balanced',
                        penalty='l2',
                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
+# base_clf=LogisticRegression()
 
 
 # tuned_parameters = {
@@ -57,7 +58,7 @@ base_clf=SGDClassifier(loss='modified_huber',
 
 grid_parameters = {
     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,],
+    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     'clf__learning_rate': [ 'adaptive',],
     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
@@ -68,10 +69,10 @@ grid_parameters = {
 }
 
 pipeline = Pipeline([
-    ('scl', StandardScaler()),
+
     ('poly', PolynomialFeatures(interaction_only=False,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
-    #     ('pca',PCA()),
+    ('scl', StandardScaler()),
     ('clf', base_clf),
 ])
 
