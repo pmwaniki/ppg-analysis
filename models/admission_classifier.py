@@ -10,20 +10,21 @@ import pandas as pd
 import scipy
 
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler
+from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures
+from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
 from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
 from settings import data_dir,weights_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-DotProduct"
+experiment="Contrastive-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -38,62 +39,56 @@ admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 
 
-base_clf=SGDClassifier(loss='modified_huber',class_weight='balanced',penalty='l2',
-                       early_stopping=True,n_iter_no_change=10,max_iter=100000)
+base_clf=SGDClassifier(loss='modified_huber',
+                       # class_weight='balanced',
+                       penalty='l2',
+                       early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
 
 
-tuned_parameters = {
-    # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-    'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
-    'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
-    'clf__learning_rate': ['constant', 'adaptive', 'invscaling'],
-    # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
-
-}
-
-#
-# base_clf=MLPClassifier(hidden_layer_sizes=(100,100,100,100,100),
-#                        early_stopping=True,n_iter_no_change=10,max_iter=100000)
-#
 # tuned_parameters = {
 #     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
 #     'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__learning_rate_init': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__learning_rate': ['constant', 'adaptive', 'invscaling'],
+#     'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
+#     'clf__learning_rate': [ 'adaptive',],
+#     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
 #     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 #
 # }
 
-# base_clf=SVC(probability=True,class_weight='balanced')
-# tuned_parameters = [
-#     {'clf__kernel': ['rbf'], 'clf__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1],
-# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
-#      'clf__C': [1, 10, 100, 1000,1e4]
-#     },
-#                     {'clf__kernel': ['linear'], 'clf__C': [1, 10, 100, 1000],
-# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
-#                     },
-#                    ]
+grid_parameters = {
+    # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
+    'clf__alpha': [1e-5,1e-4,1e-3,1e-2,1e-1,1.0],
+    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+    'clf__learning_rate': [ 'adaptive',],
+    'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
+    'poly__degree':[2,3],
+    'select__k':[5,10,15,20,25,32],
+    # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
-pipeline=Pipeline([
-    ('scl',RobustScaler()),
-#     ('pca',PCA()),
-    ('clf',base_clf),
+}
+
+pipeline = Pipeline([
+    ('scl', StandardScaler()),
+    ('poly', PolynomialFeatures(interaction_only=True)),
+    ('select', SelectKBest(mutual_info_classif, k=10)),
+    #     ('pca',PCA()),
+    ('clf', base_clf),
 ])
 
-clf = RandomizedSearchCV(pipeline, param_distributions=tuned_parameters, cv=StratifiedKFold(10, ),
-                   verbose=1, n_jobs=cores,n_iter=5000,
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=RepeatedStratifiedKFold(10,5 ),
+                   verbose=1, n_jobs=cores,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
-clf.fit(classifier_embedding,train['admitted'])
-# clf.fit(classifier_embedding_reduced,admitted_train)
+#  
+clf.fit(classifier_embedding_reduced,admitted_train)
 
 
 
 cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_results_['mean_test_roc_auc'],
               'acc':clf.cv_results_['mean_test_balanced_accuracy'],'recall':clf.cv_results_['mean_test_recall'],
-                          'precision':clf.cv_results_['mean_test_precision']})
+                          'precision':clf.cv_results_['mean_test_precision'],
+                         'f1':clf.cv_results_['mean_test_f1']})
 print(cv_results)
 
 test_pred=clf.predict_proba(test_embedding)[:,1]
