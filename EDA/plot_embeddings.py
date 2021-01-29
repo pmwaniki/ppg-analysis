@@ -23,7 +23,7 @@ from settings import data_dir
 import itertools
 
 
-experiment="Contrastive-DotProduct32"
+experiment="Contrastive-sample-DotProduct32"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
@@ -66,30 +66,30 @@ subject_spo2=np.array(subject_spo2); subject_spo2[subject_spo2<65]=np.nan
 subject_hb=np.array(subject_hb)
 subject_hr=np.array(subject_hr)
 
-pca=PCA(n_components=6)
-subject_pca=pca.fit_transform(subject_scl)
+# pca=PCA(n_components=6)
+# subject_pca=pca.fit_transform(subject_scl)
 
 
 
 
 
 
-fig,axs=plt.subplots(3,5,figsize=(15,10))
-for ax,vals in zip(axs.flatten(),itertools.combinations(range(6),2)):
-    r,c=vals
-    ax.scatter(subject_pca[subject_admitted == 0, r], subject_pca[subject_admitted == 0, c],
-                                          marker="o", label="No",
-                                          alpha=0.5)
-    ax.scatter(subject_pca[subject_admitted == 1, r], subject_pca[subject_admitted == 1, c],
-                                          marker="o", label="Yes",
-                                          alpha=0.5)
-    ax.set_xlabel(f"PCA {r + 1}")
-    ax.set_ylabel(f"PCA {c + 1}")
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-fig.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_{os.uname()[1]}_{experiment}.png")
-plt.show(block=False)
+# fig,axs=plt.subplots(3,5,figsize=(15,10))
+# for ax,vals in zip(axs.flatten(),itertools.combinations(range(6),2)):
+#     r,c=vals
+#     ax.scatter(subject_pca[subject_admitted == 0, r], subject_pca[subject_admitted == 0, c],
+#                                           marker="o", label="No",
+#                                           alpha=0.5)
+#     ax.scatter(subject_pca[subject_admitted == 1, r], subject_pca[subject_admitted == 1, c],
+#                                           marker="o", label="Yes",
+#                                           alpha=0.5)
+#     ax.set_xlabel(f"PCA {r + 1}")
+#     ax.set_ylabel(f"PCA {c + 1}")
+#     ax.set_xticks([])
+#     ax.set_yticks([])
+#
+# fig.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_{os.uname()[1]}_{experiment}.png")
+# plt.show(block=False)
 
 
 
@@ -138,7 +138,7 @@ def plot_embedding2(X,y=None, title=None,cmap=cm.hot,ax=None):
         ax.set_title(title)
 
 
-tsne = manifold.TSNE(n_components=3, init='pca', random_state=0,perplexity=100,learning_rate=100)
+tsne = manifold.TSNE(n_components=2, init='pca', random_state=0,perplexity=100,learning_rate=100)
 X_tsne = tsne.fit_transform(subject_scl)
 
 fig, axs=plt.subplots(1,3,figsize=(12,4))

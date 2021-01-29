@@ -85,7 +85,7 @@ class TriageDataset(Dataset):
 
 class TriagePairs(Dataset):
     def __init__(self, data, id_var='id', position_var = 'position', stft_fun=None, transforms=None, aug_raw=[],
-                 overlap=False,normalize=False):
+                 overlap=False,normalize=False,pretext='sample'):
         super().__init__()
         self.data=data
         self.id_var=id_var
@@ -95,6 +95,7 @@ class TriagePairs(Dataset):
         self.transforms=transforms
         self.raw_aug=aug_raw
         self.normalize=normalize
+        self.pretext=pretext
         self.client = MongoClient('mongodb://%s:%s@%s' % (Mongo.user.value, Mongo.password.value,Mongo.host.value),
                                   connect=False)
         if overlap:
@@ -110,8 +111,13 @@ class TriagePairs(Dataset):
     def __getitem__(self, item):
         rows=self.data.loc[self.data[self.id_var]==self.ids[item],:]
         sample_position=rows.sample(1)[self.position_var].values[0]
-        rows2=rows.loc[(rows[self.position_var]<(sample_position-self.position_distance)) | (rows[self.position_var]>(sample_position+self.position_distance))]
-        sample_position2=rows2[self.position_var].sample(1).values[0]
+        if self.pretext=="augment":
+            sample_position2=sample_position
+        elif self.pretext=="sample":
+            rows2=rows.loc[(rows[self.position_var]<(sample_position-self.position_distance)) | (rows[self.position_var]>(sample_position+self.position_distance))]
+            sample_position2=rows2[self.position_var].sample(1).values[0]
+        else:
+            raise NotImplementedError(f"Pretext task {self.pretext} not implemented")
         sample_rows=rows.loc[rows[self.position_var].isin([sample_position,sample_position2])]
 
         while True:
@@ -120,7 +126,10 @@ class TriagePairs(Dataset):
                 triage = self.client["triage"]
                 segments = triage.segments
                 ppg1=get_by_id(sample_rows.iloc[0]['seg_id'],segments)
-                ppg2 = get_by_id(sample_rows.iloc[1]['seg_id'], segments)
+                if self.pretext=="augment":
+                    ppg2=ppg1
+                elif self.pretext=="sample":
+                    ppg2 = get_by_id(sample_rows.iloc[1]['seg_id'], segments)
                 break
             except Exception as e:
                 print(f"failed to fetch item {item}, retrying ...")
@@ -159,3 +168,4 @@ class TriagePairs(Dataset):
             return x1,stft_x1,x2,stft_x2
         else:
             return x1,x2
+

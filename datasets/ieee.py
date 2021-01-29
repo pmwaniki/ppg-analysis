@@ -14,7 +14,7 @@ if "segments" in ieee.list_collection_names():
 segments=ieee.segments
 
 fs=125
-sig_lenght=8
+sig_lenght=10
 samples=fs*sig_lenght
 slide=2
 

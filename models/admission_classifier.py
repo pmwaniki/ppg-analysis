@@ -39,11 +39,11 @@ admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 
 
-base_clf=SGDClassifier(loss='modified_huber',
-                       # class_weight='balanced',
-                       penalty='l2',
-                       early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
-# base_clf=LogisticRegression()
+# base_clf=SGDClassifier(loss='modified_huber',
+#                        # class_weight='balanced',
+#                        penalty='l2',
+#                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
+base_clf=LogisticRegression(max_iter=500000)
 
 
 # tuned_parameters = {
@@ -57,20 +57,20 @@ base_clf=SGDClassifier(loss='modified_huber',
 # }
 
 grid_parameters = {
-    # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
-    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
-    'clf__learning_rate': [ 'adaptive',],
+    'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
+    # 'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
+    # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+    # 'clf__learning_rate': [ 'adaptive',],
     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-    'poly__degree':[2,],
-    'select__percentile':[1, 3, 6, 10, 15, 20, 30, 40, 60, 80, 100],
+    'poly__degree':[2,3],
+    'select__percentile':[5, 10, 15, 20, 30, 40, 60,70],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
 
 pipeline = Pipeline([
 
-    ('poly', PolynomialFeatures(interaction_only=False,include_bias=False)),
+    ('poly', PolynomialFeatures(interaction_only=True,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
     ('clf', base_clf),
@@ -78,7 +78,7 @@ pipeline = Pipeline([
 
 clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=RepeatedStratifiedKFold(10,5 ),
                    verbose=1, n_jobs=cores,#n_iter=500,
-                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
+                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='f1',
                    return_train_score=True,
                    )
 #  
