@@ -25,7 +25,7 @@ from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
 experiment="Contrastive-sample-DotProduct32"
-weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
+weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 
@@ -43,7 +43,7 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #                        # class_weight='balanced',
 #                        penalty='l2',
 #                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
-base_clf=LogisticRegression(max_iter=500000)
+base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga')
 
 
 # tuned_parameters = {
@@ -58,12 +58,15 @@ base_clf=LogisticRegression(max_iter=500000)
 
 grid_parameters = {
     'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
+    'clf__penalty':['l1',"l2","elastic","none"],
     # 'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
     # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     # 'clf__learning_rate': [ 'adaptive',],
     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
     'poly__degree':[2,3],
+    'poly__interaction_only':[True,False],
     'select__percentile':[5, 10, 15, 20, 30, 40, 60,70],
+    'select__score_func': [mutual_info_classif,f_classif],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
