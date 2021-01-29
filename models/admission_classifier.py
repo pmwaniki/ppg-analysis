@@ -57,20 +57,20 @@ base_clf=SGDClassifier(loss='modified_huber',
 
 grid_parameters = {
     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-    'clf__alpha': [1e-5,1e-4,1e-3,1e-2,1e-1,1.0],
+    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0],
     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     'clf__learning_rate': [ 'adaptive',],
     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-    'poly__degree':[2,3],
-    'select__k':[5,10,15,20,25,32],
+    'poly__degree':[2,],
+    'select__k':[ 30,50,150,300,400,500],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
 
 pipeline = Pipeline([
     ('scl', StandardScaler()),
-    ('poly', PolynomialFeatures(interaction_only=True)),
-    ('select', SelectKBest(mutual_info_classif, k=10)),
+    ('poly', PolynomialFeatures(interaction_only=True,include_bias=False)),
+    ('select', SelectKBest(mutual_info_classif)),
     #     ('pca',PCA()),
     ('clf', base_clf),
 ])
