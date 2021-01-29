@@ -11,7 +11,7 @@ import scipy
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures
-from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif
+from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
 from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifier
 from sklearn.neural_network import MLPClassifier
@@ -57,20 +57,20 @@ base_clf=SGDClassifier(loss='modified_huber',
 
 grid_parameters = {
     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0],
+    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,],
     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     'clf__learning_rate': [ 'adaptive',],
     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
     'poly__degree':[2,],
-    'select__k':[ 30,50,150,300,400,500],
+    'select__percentile':[1, 3, 6, 10, 15, 20, 30, 40, 60, 80, 100],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
 
 pipeline = Pipeline([
     ('scl', StandardScaler()),
-    ('poly', PolynomialFeatures(interaction_only=True,include_bias=False)),
-    ('select', SelectKBest(mutual_info_classif)),
+    ('poly', PolynomialFeatures(interaction_only=False,include_bias=False)),
+    ('select', SelectPercentile(mutual_info_classif)),
     #     ('pca',PCA()),
     ('clf', base_clf),
 ])
