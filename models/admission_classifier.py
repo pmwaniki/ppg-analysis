@@ -43,7 +43,8 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #                        # class_weight='balanced',
 #                        penalty='l2',
 #                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
-base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga')
+# base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga')
+base_clf=SVC(probability=True,class_weight="balanced")
 
 
 # tuned_parameters = {
@@ -57,16 +58,18 @@ base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga')
 # }
 
 grid_parameters = {
-    'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
-    'clf__penalty':['l1',"l2","elastic","none"],
+    # 'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
+    'clf__C': [1.0, 10, 100, 1000, 10000],
+    'clf__kernel': ['linear', 'poly', 'rbf'],
+    # 'clf__penalty':['l1',"l2","elastic","none"],
     # 'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
     # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     # 'clf__learning_rate': [ 'adaptive',],
-    'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-    'poly__degree':[2,3],
-    'poly__interaction_only':[True,False],
-    'select__percentile':[5, 10, 15, 20, 30, 40, 60,70],
-    'select__score_func': [mutual_info_classif,f_classif],
+    # 'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
+    'poly__degree': [2, ],
+    'poly__interaction_only': [True, False],
+    'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70],
+    'select__score_func': [mutual_info_classif, f_classif],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
