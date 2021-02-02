@@ -58,7 +58,7 @@ base_clf=LogisticRegression(penalty='elasticnet',max_iter=500000,random_state=12
 # }
 
 grid_parameters = {
-    'clf__C': [100.0,10.0,1.0,1e-1,1e-2,1e-3,1e-4],
+    'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
     # 'clf__C': [1.0, 10, 100, 1000, 10000],
