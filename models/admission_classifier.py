@@ -11,7 +11,7 @@ import scipy
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures
-from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile
+from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile,VarianceThreshold
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
 from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifier
 from sklearn.neural_network import MLPClassifier
@@ -25,7 +25,7 @@ from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
 experiment="Contrastive-sample-DotProduct32"
-weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}.joblib")
+weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 
@@ -43,8 +43,8 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #                        # class_weight='balanced',
 #                        penalty='l2',
 #                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
-# base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga')
-base_clf=SVC(probability=True,class_weight="balanced")
+base_clf=LogisticRegression(max_iter=500000,random_state=123,solver='saga',class_weight='balanced')
+# base_clf=SVC(probability=True,class_weight="balanced")
 
 
 # tuned_parameters = {
@@ -58,10 +58,10 @@ base_clf=SVC(probability=True,class_weight="balanced")
 # }
 
 grid_parameters = {
-    # 'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
-    'clf__C': [1.0, 10, 100, 1000, 10000],
-    'clf__kernel': ['linear', 'poly', 'rbf'],
-    # 'clf__penalty':['l1',"l2","elastic","none"],
+    'clf__C': [1.0,1e-1,1e-2,1e-3,1e-4],
+    # 'clf__C': [1.0, 10, 100, 1000, 10000],
+    # 'clf__kernel': ['linear', 'poly', 'rbf'],
+    'clf__penalty':['l1',"l2","elastic",],
     # 'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
     # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     # 'clf__learning_rate': [ 'adaptive',],
@@ -75,7 +75,7 @@ grid_parameters = {
 }
 
 pipeline = Pipeline([
-
+    ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(interaction_only=True,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
