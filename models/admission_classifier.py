@@ -43,7 +43,7 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #                        # class_weight='balanced',
 #                        penalty='l2',
 #                        early_stopping=True,n_iter_no_change=100,max_iter=500000,random_state=123)
-base_clf=LogisticRegression(penalty='elasticnet',max_iter=500000,random_state=123,solver='saga',class_weight='balanced')
+base_clf=LogisticRegression(penalty='elasticnet',max_iter=500000,random_state=289,solver='saga',class_weight='balanced')
 # base_clf=SVC(probability=True,class_weight="balanced")
 
 
@@ -67,7 +67,7 @@ grid_parameters = {
     # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     # 'clf__learning_rate': [ 'adaptive',],
     # 'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-    'poly__degree': [2, ],
+    # 'poly__degree': [2, ],
     'poly__interaction_only': [True, False],
     'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70],
     'select__score_func': [mutual_info_classif, ],
@@ -77,15 +77,15 @@ grid_parameters = {
 
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
-    ('poly', PolynomialFeatures(interaction_only=True,include_bias=False)),
+    ('poly', PolynomialFeatures(degree=2,interaction_only=True,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
     ('clf', base_clf),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=RepeatedStratifiedKFold(10,5 ),
-                   verbose=1, n_jobs=cores,#n_iter=500,
-                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='f1',
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ),
+                   verbose=3, n_jobs=cores,#n_iter=500,
+                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
 #  
