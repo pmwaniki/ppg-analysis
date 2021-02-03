@@ -72,9 +72,9 @@ grid_parameters = {
     # 'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
     # 'clf__learning_rate': [ 'adaptive',],
     # 'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-    # 'poly__degree': [2, ],
+    'poly__degree': [1,2, ],
     'poly__interaction_only': [True, False],
-    'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70],
+    'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70,100],
     'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
