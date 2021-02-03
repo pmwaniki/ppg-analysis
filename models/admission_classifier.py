@@ -11,7 +11,7 @@ import scipy
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures
-from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile,VarianceThreshold
+from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile,VarianceThreshold,RFECV
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
 from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifier
 from sklearn.neural_network import MLPClassifier
@@ -68,14 +68,14 @@ grid_parameters = {
 
     # 'clf__C': [1.0, 10, 100, 1000, 10000],
     # 'clf__kernel': ['linear', 'poly', 'rbf'],
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
-    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
-    'clf__loss': ['log','modified_huber'],
-    'clf__learning_rate': [ 'adaptive',],
+    'clf__estimator__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
+    'clf__estimator__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+    'clf__estimator__loss': ['modified_huber'],
+    'clf__estimator__learning_rate': [ 'adaptive',],
     'poly__degree': [1,2, ],
     'poly__interaction_only': [True, False],
-    'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70,100],
-    'select__score_func': [mutual_info_classif, ],
+    # 'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70,100],
+    # 'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
@@ -83,9 +83,9 @@ grid_parameters = {
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(degree=2,interaction_only=True,include_bias=False)),
-    ('select', SelectPercentile(mutual_info_classif)),
+    # ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
-    ('clf', base_clf),
+    ('clf', RFECV(estimator=base_clf)),
 ])
 
 clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ),
