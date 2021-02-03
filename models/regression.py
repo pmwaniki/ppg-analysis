@@ -18,7 +18,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
-from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile
+from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from settings import data_dir,weights_dir
@@ -27,7 +27,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-sample-DotProduct32"
+experiment="Contrastive-augment-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
@@ -65,7 +65,7 @@ hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
          'select__score_func':[mutual_info_regression,f_regression]
         }
 pipeline_hr = Pipeline([
-
+('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
     ('scl', StandardScaler()),
@@ -116,7 +116,7 @@ regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopp
 # regressor_resp_rate=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
-
+('variance_threshold',VarianceThreshold()),
     ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     ('select',SelectPercentile()),
     ('scl', StandardScaler()),
@@ -182,7 +182,7 @@ regressor_spo2=SGDRegressor(loss='squared_loss',max_iter=500000,early_stopping=T
 # regressor_spo2=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_spo2 = Pipeline([
-
+('variance_threshold',VarianceThreshold()),
     # ('pca',PCA()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
@@ -235,15 +235,48 @@ plt.show()
 joblib.dump(spo2_clf,os.path.join(data_dir,f"results/weights/Regression_spo2_{experiment}.joblib"))
 
 #combined plot ******************************************************************************************************************************************
-fig,axs=plt.subplots(1,3)
+
+hr_clf=joblib.load(os.path.join(data_dir,f"results/weights/Regression_hr_{experiment}.joblib"))
+test_pred_hr=hr_clf.predict(test_embedding_reduced)
+r2_hr=r2_score(hr_test[hr_test!=0],test_pred_hr[hr_test !=0 ])
+rmse_hr=mean_squared_error(hr_test[hr_test!=0],test_pred_hr[hr_test !=0 ],squared=False)
+
+resp_rate_clf=joblib.load(os.path.join(data_dir,f"results/weights/Regression_resp_rate_{experiment}.joblib"))
+test_pred_resp_rate=resp_rate_clf.predict(test_embedding_reduced)
+r2_rest_rate=r2_score(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
+rmse_rest_rate=mean_squared_error(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)],squared=False)
+
+spo2_clf=joblib.load(os.path.join(data_dir,f"results/weights/Regression_spo2_{experiment}.joblib"))
+test_pred_spo2=spo2_clf.predict(test_embedding_reduced)
+r2_spo2=r2_score(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
+rmse_spo2=mean_squared_error(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70],squared=False)
+
+
+fig,axs=plt.subplots(1,3,figsize=(12,4))
 
 axs[0].scatter(hr_test[hr_test!=0],test_pred_hr[hr_test !=0 ])
 axs[0].plot([50,225],[50,225],'r--')
+axs[0].text(0.05,0.90,f"r2={r2_hr:.2f}\nrmse={rmse_hr:.1f}",transform=axs[0].transAxes,
+            bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
 axs[0].set_xlabel("Observed")
 axs[0].set_ylabel("Predicted")
-axs[0].set_title("Respiratory rate")
+axs[0].set_title("Heart rate")
 
+axs[1].scatter(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
+axs[1].plot([20,100],[20,100],'r--')
+axs[1].text(0.05,0.9,f"r2={r2_rest_rate:.2f}\nrmse={rmse_rest_rate:.1f}",transform=axs[1].transAxes,
+            bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
+axs[1].set_xlabel("Observed")
+axs[1].set_ylabel("Predicted")
+axs[1].set_title("Respiratory rate")
 
+axs[2].scatter(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
+axs[2].plot([70,100],[70,100],'r--')
+axs[2].text(0.05,0.9,f"r2={r2_spo2:.2f}\nrmse={rmse_spo2:.1f}",transform=axs[2].transAxes,
+            bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
+axs[2].set_xlabel("Observed")
+axs[2].set_ylabel("Predicted")
+axs[2].set_title("SPO2")
 
 plt.show()
 
