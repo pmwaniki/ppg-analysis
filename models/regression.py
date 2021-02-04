@@ -27,7 +27,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-augment-DotProduct32"
+experiment="Contrastive-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
@@ -57,17 +57,18 @@ def identity_fun(x):
 #******************************************************************************************************************
 
 regressor_hr=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True,random_state=123)
-hr_grid={'clf__estimator__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
-                'clf__estimator__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
-         'poly__degree':[1,2,],
-         'poly__interaction_only':[True,False],
-         # 'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
-         # 'select__score_func':[mutual_info_regression,f_regression]
-        }
+hr_grid = {'clf__estimator__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
+           'clf__estimator__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
+           'clf__estimator__loss': ['huber', 'squared_loss'],
+           'poly__degree': [1, 2, ],
+           'poly__interaction_only': [True, False],
+           # 'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
+           # 'select__score_func':[mutual_info_regression,f_regression]
+           }
 pipeline_hr = Pipeline([
 ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
-    ('select', SelectPercentile()),
+    # ('select', SelectPercentile()),
     ('scl', StandardScaler()),
     ('clf', RFECV(estimator=regressor_hr,step=1,cv=5 )),
 ])
@@ -115,26 +116,22 @@ regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopp
 pipeline_resp_rate=Pipeline([
 ('variance_threshold',VarianceThreshold()),
     ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
-    ('select',SelectPercentile()),
+    # ('select',SelectPercentile()),
     ('scl', StandardScaler()),
-    ('clf',TransformedTargetRegressor(regressor=regressor_resp_rate,
-#                                       transformer=QuantileTransformer(output_distribution="normal", n_quantiles=500),
-#                                       transformer=PowerTransformer(method='box-cox'),
-                                      func=identity_fun,inverse_func=identity_fun,
-                                      )),
+    ('clf',RFECV(estimator=regressor_resp_rate)),
 ])
 resp_rate_grid = {
-    'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
-                  'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-                  'clf__regressor__loss': ['squared_loss', 'huber'],
+    'clf__estimator__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
+    'clf__estimator__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
+    'clf__estimator__loss': ['squared_loss', 'huber'],
     # 'clf__regressor__C': [1, 10, 100, 1000, 10000],
     # 'clf__regressor__kernel': ['linear', 'poly', 'rbf'],
     #                 'clf__transformer__n_quantiles':[200,300,500,700,900],
     # 'pca__n_components':[2,4,8,16,32],
-    'poly__degree': [2, ],
+    'poly__degree': [1,2, ],
     'poly__interaction_only': [True, False],
-    'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
-    'select__score_func': [mutual_info_regression, ]
+    # 'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
+    # 'select__score_func': [mutual_info_regression, ]
 }
 resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
