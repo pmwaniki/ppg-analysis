@@ -18,7 +18,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
-from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold
+from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold,RFECV
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from settings import data_dir,weights_dir
@@ -57,22 +57,19 @@ def identity_fun(x):
 #******************************************************************************************************************
 
 regressor_hr=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True,random_state=123)
-hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
-                'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
-         'poly__degree':[2,],
+hr_grid={'clf__estimator__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
+                'clf__estimator__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
+         'poly__degree':[1,2,],
          'poly__interaction_only':[True,False],
-         'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
-         'select__score_func':[mutual_info_regression,f_regression]
+         # 'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
+         # 'select__score_func':[mutual_info_regression,f_regression]
         }
 pipeline_hr = Pipeline([
 ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
     ('scl', StandardScaler()),
-    ('clf', TransformedTargetRegressor(regressor=regressor_hr,
-                                       #                                       transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000),
-                                       func=identity_fun, inverse_func=identity_fun
-                                       )),
+    ('clf', RFECV(estimator=regressor_hr,step=1,cv=5 )),
 ])
 
 hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10),n_jobs=cores,
