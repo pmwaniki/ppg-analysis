@@ -63,11 +63,12 @@ class InputShapeSetter(skorch.callbacks.Callback):
     def on_train_begin(self, net, X, y):
         net.set_params(module__dim_x=X.shape[-1])
 
+early_stoping=skorch.callbacks.EarlyStopping(patience=10)
 
-
-base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=1000, lr=0.01, batch_size=32,
+base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=10000, lr=0.01, batch_size=128,
                                    optimizer=optim.RMSprop,verbose=False,device=device,
-                                   train_split=None,callbacks=[InputShapeSetter])
+                                   train_split=skorch.dataset.CVSplit(10),
+                                   callbacks=[InputShapeSetter,early_stoping])
 
 # base_clf=SGDClassifier(loss='modified_huber',
 #                        class_weight='balanced',
@@ -96,14 +97,14 @@ grid_parameters = {
     'clf__lr':[0.01,0.001,0.0001,0.00001],
     'clf__criterion__pos_weight':[torch.tensor(3.0)],
     'clf__optimizer__weight_decay':[0.00001,0.0001,0.001,0.01,0.1],
-    # 'clf__batch_size':[16,32,64,128],
+    'clf__batch_size':[32,64,128,256],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
 
     # 'poly__degree': [1,2, ],
     # 'poly__interaction_only': [True, False],
-    'select__percentile': [ 10, 15, 20, 30, 40, 60, 70,100],
+    # 'select__percentile': [ 10, 15, 20, 30, 40, 60, 70,100],
     # 'select__score_func': [mutual_info_classif, ],
 
 }
@@ -111,7 +112,7 @@ grid_parameters = {
 pipeline = Pipeline([
     # ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
-    ('select', SelectPercentile(mutual_info_classif)),
+    # ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
     # ('clf', RFECV(estimator=base_clf)),
 ('clf', base_clf),
