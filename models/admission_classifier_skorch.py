@@ -65,8 +65,8 @@ class InputShapeSetter(skorch.callbacks.Callback):
 
 early_stoping=skorch.callbacks.EarlyStopping(patience=10)
 
-base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=10000, lr=0.01, batch_size=128,
-                                   optimizer=optim.RMSprop,verbose=False,device=device,
+base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=10000, lr=0.01, batch_size=64,
+                                   optimizer=optim.SGD,verbose=False,device=device,
                                    train_split=None,
                                    callbacks=[InputShapeSetter,])
 
@@ -96,9 +96,10 @@ base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=10000, lr=0.01, batch_s
 grid_parameters = {
     'clf__lr':[0.01,0.001,0.0001,0.00001],
     'clf__criterion__pos_weight':[torch.tensor(3.0)],
-    'clf__optimizer__weight_decay':[0.00001,0.0001,0.001,0.01,0.1],
+    'clf__optimizer__weight_decay':[1e-6,0.00001,0.0001,0.001,0.01,0.1],
+    'clf__optimizer__momentum':[0.9,],
     # 'clf__batch_size':[32,64,128,256],
-    'clf__max_epochs':[150,500,1000,2000,5000,10000]
+    'clf__max_epochs':[300,500,750,1000,2000,5000],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
