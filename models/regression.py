@@ -18,7 +18,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
-from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold
+from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from settings import data_dir,weights_dir
@@ -27,7 +27,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-augment-DotProduct32"
+experiment="Contrastive-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
@@ -61,11 +61,11 @@ hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
                 'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
          'poly__degree':[2,],
          'poly__interaction_only':[True,False],
-         'select__percentile': [ 10, 15, 20, 30, 40, 60,100],
-         'select__score_func':[mutual_info_regression,]
+         'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
+         'select__score_func':[mutual_info_regression,f_regression]
         }
 pipeline_hr = Pipeline([
-('variance_threshold',VarianceThreshold()),
+
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
     ('scl', StandardScaler()),
@@ -116,7 +116,7 @@ regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopp
 # regressor_resp_rate=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
-('variance_threshold',VarianceThreshold()),
+
     ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     ('select',SelectPercentile()),
     ('scl', StandardScaler()),
@@ -182,7 +182,7 @@ regressor_spo2=SGDRegressor(loss='squared_loss',max_iter=500000,early_stopping=T
 # regressor_spo2=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_spo2 = Pipeline([
-('variance_threshold',VarianceThreshold()),
+
     # ('pca',PCA()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
