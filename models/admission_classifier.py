@@ -51,33 +51,23 @@ base_clf=SGDClassifier(loss='modified_huber',
 #     random_state=56,
 #     # solver='saga',
 #     class_weight='balanced')
-# base_clf=SVC(probability=True,class_weight="balanced")
 
 
-# tuned_parameters = {
-#     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-#     'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__learning_rate': [ 'adaptive',],
-#     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-#     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
-#
-# }
+
 
 grid_parameters = {
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
-    # 'clf__C': [1.0, 10, 100, 1000, 10000],
-    # 'clf__kernel': ['linear', 'poly', 'rbf'],
-    'clf__estimator__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
-    'clf__estimator__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
-    'clf__estimator__loss': ['modified_huber'],
-    'clf__estimator__learning_rate': [ 'adaptive',],
+
+    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
+    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+#     'clf__loss': ['modified_huber'],
+#     'clf__learning_rate': [ 'adaptive',],
     'poly__degree': [1,2, ],
     'poly__interaction_only': [True, False],
-    # 'select__percentile': [5, 10, 15, 20, 30, 40, 60, 70,100],
-    # 'select__score_func': [mutual_info_classif, ],
+    'select__percentile': [10, 15, 20, 30, 40, 60, 70,100],
+    'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
@@ -85,9 +75,9 @@ grid_parameters = {
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(degree=2,interaction_only=True,include_bias=False)),
-    # ('select', SelectPercentile(mutual_info_classif)),
+    ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
-    ('clf', RFECV(estimator=base_clf,step=50)),
+    ('clf', base_clf),
 ])
 
 clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
