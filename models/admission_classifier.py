@@ -44,7 +44,9 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 base_clf=SGDClassifier(loss='modified_huber',
                        class_weight='balanced',
                        penalty='l2',
-                       early_stopping=True,n_iter_no_change=20,max_iter=500000,random_state=123)
+                       early_stopping=False,
+#                        validation_fraction=0.05,n_iter_no_change=20,
+                       max_iter=100,random_state=123)
 # base_clf=LogisticRegression(
 #     # penalty='elasticnet',
 #     max_iter=500000,
@@ -62,12 +64,13 @@ grid_parameters = {
 
     'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+#     'clf__max_iter':[5,10,50,100,200,500],
 #     'clf__loss': ['modified_huber'],
 #     'clf__learning_rate': [ 'adaptive',],
-    'poly__degree': [1,2, ],
-    'poly__interaction_only': [True, False],
+    'poly__degree': [2, ],
+    'poly__interaction_only': [ False,],
     'select__percentile': [10, 15, 20, 30, 40, 60, 70,100],
-    'select__score_func': [mutual_info_classif, ],
+#     'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
 }
@@ -80,7 +83,7 @@ pipeline = Pipeline([
     ('clf', base_clf),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123),
                    verbose=1, n_jobs=cores,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
