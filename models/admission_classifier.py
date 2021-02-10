@@ -23,6 +23,8 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
+
+# rng=np.random.RandomState(123)
 cores=multiprocessing.cpu_count()-2
 experiment="Contrastive-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
@@ -85,10 +87,10 @@ pipeline = Pipeline([
     ('poly', PolynomialFeatures(degree=2,interaction_only=True,include_bias=False)),
     # ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
-    ('clf', RFECV(estimator=base_clf)),
+    ('clf', RFECV(estimator=base_clf,step=50)),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ),
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
                    verbose=1, n_jobs=cores,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
