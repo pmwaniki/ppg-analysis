@@ -70,7 +70,7 @@ pipeline_hr = Pipeline([
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     # ('select', SelectPercentile()),
     ('scl', StandardScaler()),
-    ('clf', RFECV(estimator=regressor_hr,step=1,cv=5 )),
+    ('clf', RFECV(estimator=regressor_hr,step=50,cv=5 )),
 ])
 
 hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10),n_jobs=cores,
@@ -118,7 +118,7 @@ pipeline_resp_rate=Pipeline([
     ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     # ('select',SelectPercentile()),
     ('scl', StandardScaler()),
-    ('clf',RFECV(estimator=regressor_resp_rate)),
+    ('clf',RFECV(estimator=regressor_resp_rate,step=50)),
 ])
 resp_rate_grid = {
     'clf__estimator__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
@@ -179,31 +179,27 @@ pipeline_spo2 = Pipeline([
 ('variance_threshold',VarianceThreshold()),
     # ('pca',PCA()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
-    ('select', SelectPercentile()),
+    # ('select', SelectPercentile()),
     ('scl', StandardScaler()),
-    ('clf', TransformedTargetRegressor(regressor=regressor_spo2,
-                                       # transformer=QuantileTransformer(output_distribution="normal", n_quantiles=20),
-                                       # transformer=PowerTransformer(method='box-cox',standardize=True),
-                                       func=identity_fun, inverse_func=identity_fun,
-                                       )),
+    ('clf', RFECV(estimator=regressor_spo2,step=50)),
 ])
 spo2_grid = {
-    'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
-             'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-             'clf__regressor__loss':['squared_loss','huber'],
-             # 'clf__regressor__C':[1,10,100,1000,10000],
-             # 'clf__regressor__kernel':['linear', 'poly', 'rbf'],
-             # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
-             # 'pca__n_components':[2,4,8,16,32],
-             'poly__degree': [2, ],
-             'poly__interaction_only': [True, False],
-             'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
-             'select__score_func': [mutual_info_regression, ],
-             }
+    'clf__estimator__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
+    'clf__estimator__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
+    'clf__estimator__loss': ['squared_loss', 'huber'],
+    # 'clf__regressor__C':[1,10,100,1000,10000],
+    # 'clf__regressor__kernel':['linear', 'poly', 'rbf'],
+    # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
+    # 'pca__n_components':[2,4,8,16,32],
+    'poly__degree': [2, ],
+    'poly__interaction_only': [True, False],
+    # 'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
+    # 'select__score_func': [mutual_info_regression, ],
+}
 spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2',error_score=-1.0)
-spo2_clf.fit(classifier_embedding_reduced[spo2_train>70,:],spo2_train[spo2_train>70])
+                    refit='r2',)
+spo2_clf.fit(classifier_embedding_reduced[spo2_train>75,:],spo2_train[spo2_train>75])
 
 cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
                               'rmse':spo2_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
@@ -248,28 +244,28 @@ rmse_spo2=mean_squared_error(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70
 
 fig,axs=plt.subplots(1,3,figsize=(12,4))
 
-axs[0].scatter(hr_test[hr_test!=0],test_pred_hr[hr_test !=0 ])
+axs[0].scatter(test_pred_hr[hr_test !=0 ],hr_test[hr_test!=0],)
 axs[0].plot([50,225],[50,225],'r--')
 axs[0].text(0.05,0.90,f"r2={r2_hr:.2f}\nrmse={rmse_hr:.1f}",transform=axs[0].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
-axs[0].set_xlabel("Observed")
-axs[0].set_ylabel("Predicted")
+axs[0].set_ylabel("Observed")
+axs[0].set_xlabel("Predicted")
 axs[0].set_title("Heart rate")
 
-axs[1].scatter(resp_rate_test[~np.isnan(resp_rate_test)],test_pred_resp_rate[~np.isnan(resp_rate_test)])
+axs[1].scatter(test_pred_resp_rate[~np.isnan(resp_rate_test)],resp_rate_test[~np.isnan(resp_rate_test)],)
 axs[1].plot([20,100],[20,100],'r--')
 axs[1].text(0.05,0.9,f"r2={r2_rest_rate:.2f}\nrmse={rmse_rest_rate:.1f}",transform=axs[1].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
-axs[1].set_xlabel("Observed")
-axs[1].set_ylabel("Predicted")
+axs[1].set_ylabel("Observed")
+axs[1].set_xlabel("Predicted")
 axs[1].set_title("Respiratory rate")
 
-axs[2].scatter(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
+axs[2].scatter(test_pred_spo2[spo2_test>70],spo2_test[spo2_test>70],)
 axs[2].plot([70,100],[70,100],'r--')
 axs[2].text(0.05,0.9,f"r2={r2_spo2:.2f}\nrmse={rmse_spo2:.1f}",transform=axs[2].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
-axs[2].set_xlabel("Observed")
-axs[2].set_ylabel("Predicted")
+axs[2].set_ylabel("Observed")
+axs[2].set_xlabel("Predicted")
 axs[2].set_title("SPO2")
 
 plt.show()
