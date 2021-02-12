@@ -249,7 +249,7 @@ class Trainer(tune.Trainable):
         self.model=get_model(config).to(device)
         self.optimizer=get_optimizer(config,self.model)
 
-        self.criterion=nn.BCEWithLogitsLoss(pos_weight=torch.tensor(1.5)).to(device)
+        self.criterion=nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config['pos_weight'])).to(device)
         self.train_loader,self.val_loader=get_loader(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -269,13 +269,11 @@ class Trainer(tune.Trainable):
 
 configs = {
     'dropout':tune.loguniform(0.0001,0.5),
-    # 'enc_output_size':tune.choice([16,32,64,128,256,512,1024]),
     'representation_size':tune.choice([32,]),
     'batch_size':tune.choice([8,16,32,64,128]),
-    # 'enc_temp':tune.loguniform(0.0001,0.5),
+    'pos_weight':tune.choice([1.0,3.0,5.0,10.0]),
     'enc_lr':tune.loguniform(0.00001,0.01),
     'enc_l2':tune.loguniform(0.0000001,0.05),
-    # 'enc_l1':tune.loguniform(0.000001,0.05),
     'aug_gaus':tune.choice([0,0.2,0.5,0.8,1.0]),
     'aug_num_seg':tune.choice([2,5,10,20,40,80]),
     'aug_prop_seg':tune.choice([0.05,0.1,0.3,0.5,0.9]),
@@ -284,10 +282,10 @@ configs = {
 config={i:v.sample() for i,v in configs.items()}
 
 scheduler = ASHAScheduler(
-        metric="loss",
-        mode="min",
+        metric="f1",
+        mode="max",
         max_t=350,
-        grace_period=5,
+        grace_period=10,
         reduction_factor=2)
 # scheduler=AsyncHyperBandScheduler(
 #         time_attr="training_iteration",
@@ -301,7 +299,7 @@ if __name__=="__main__":
 
     reporter = CLIReporter(
         # parameter_columns=["l1", "l2", "lr", "batch_size"],
-        metric_columns=["loss", "accuracy", "training_iteration"])
+        metric_columns=["loss", "accuracy","f1", "training_iteration"])
     result = tune.run(
         Trainer,
         # metric='loss',
@@ -319,12 +317,12 @@ if __name__=="__main__":
         raise_on_failed_trial=False)
     df = result.results_df
     # df.to_csv(os.path.join(data_dir, "results/hypersearch.csv"), index=False)
-    best_trial = result.get_best_trial("loss", "min", "last")
-    best_config=result.get_best_config('loss','min')
+    best_trial = result.get_best_trial("f1", "max", "last")
+    best_config=result.get_best_config('f1','max')
 
     best_model=get_model(best_config)
-    best_trial=result.get_best_trial('loss','min')
-    best_checkpoint=result.get_best_checkpoint(best_trial,'loss','min')
+    best_trial=result.get_best_trial('f1','max')
+    best_checkpoint=result.get_best_checkpoint(best_trial,'f1','max')
     model_state=torch.load(best_checkpoint)
 
 
@@ -357,362 +355,3 @@ if __name__=="__main__":
 
 
 
-# joblib.dump((classifier_embedding,test_embedding,train_full,test_full),
-#             os.path.join(data_dir,f"results/{experiment}.joblib"))
-
-
-
-# best_trained_model=get_model(best_trial.config)
-# best_checkpoint_dir = result.get_best_logdir("loss",mode="min")
-# model_state, optimizer_state = torch.load(os.path.join(
-#     best_checkpoint_dir, "checkpoint"))
-# best_trained_model.load_state_dict(model_state)
-
-# model=Classifier(in_features=2,hid_dim=64,z_dim=64)
-# base_model=resnet1d(num_classes=enc_representation_size)
-# # model=WaveNetModel(layers=6,blocks=6,dilation_channels=32,residual_channels=32,skip_channels=1024,
-# #                         classes=enc_output_size,kernel_size=3,input_length=800)
-# model=EncoderRaw(base_model,representation_size=enc_representation_size,
-#                  dropout=dropout_,num_classes=enc_output_size)
-# model.fc=MLP(enc_representation_size,num_classes=enc_output_size)
-# model.fc = nn.Sequential(
-#     nn.BatchNorm1d(model.out_features),
-#     nn.ReLU(),
-#     nn.Dropout(dropout_),
-#     nn.Linear(model.out_features,enc_representation_size),
-#     nn.BatchNorm1d(enc_representation_size),
-#     nn.ReLU(),
-#     nn.Dropout(dropout_),
-#     nn.Linear(enc_representation_size,enc_output_size)
-# )
-
-# model.apply(init_fun)
-#
-# model=model.to(device)
-# optimizer=torch.optim.Adam(params=model.parameters(),lr=enc_lr_ ,weight_decay=enc_l2_)
-# # optimizer=torch.optim.SGD(params=model.parameters(),lr=enc_lr_ ,weight_decay=enc_l2_,momentum=0.99)
-# # criterion=losses.TripletMarginLoss(margin=2.0).to(device)
-# criterion=losses.NTXentLoss(temperature=enc_temp,
-#                             distance=distances.LpDistance(normalize_embeddings=False),
-#                             # embedding_regularizer=regularizers.LpRegularizer(p=1)
-#                             ).to(device)
-# calculator=AccuracyCalculator(k=1)
-# epochs=700
-# scheduler=ReduceLROnPlateau(optimizer,factor=0.5,patience=10,verbose=True,min_lr=1e-6)
-# # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,max_lr=1e-1,epochs=epochs,steps_per_epoch=len(train_loader))
-#
-#
-#
-# epoch=0
-# best_model={'loss':np.Inf,'params':None,'auc':0}
-# early_stop_counter=0
-# losses_=[]
-# aucs=[]
-# for epoch in range(epoch,epochs):
-#     train_loss=0
-#     test_loss=0
-#
-#     model.train()
-#     print("epoch: %d >> learning rate at beginning of epoch: %.5f" % (epoch,optimizer.param_groups[0]['lr']))
-#     for x1_raw,  x2_raw in tqdm(encoder_train_loader):
-#         x1_raw = x1_raw.to(device, dtype=torch.float)
-#         xis = model( x1_raw)
-#         x2_raw = x2_raw.to(device, dtype=torch.float)
-#         xjs = model( x2_raw)
-#         xis = nn.functional.normalize(xis, dim=1)
-#         xjs = nn.functional.normalize(xjs, dim=1)
-#         embeddings=torch.cat([xis,xjs],dim=0)
-#         labels=torch.cat([torch.arange(xis.shape[0]),]*2).to(device)
-#         loss = criterion(embeddings,labels)
-#         l1_reg=enc_l1_ * torch.norm(embeddings,p=1,dim=1).mean()
-#         loss+=l1_reg
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-#         train_loss += loss.item() / len(encoder_train_loader)
-#         # metrics=calculator.get_accuracy(xis.cpu().detach().numpy(),xjs.cpu().detach().numpy(),
-#         #                         np.arange(xis.shape[0]),np.arange(xis.shape[0]),
-#         #                         False)
-#
-#
-#     model.eval()
-#     test_loss=0
-#     with torch.no_grad():
-#         for x1_raw, x2_raw in tqdm(encoder_test_loader):
-#             x1_raw= x1_raw.to(device, dtype=torch.float)
-#             xis = model( x1_raw)
-#             x2_raw= x2_raw.to(device, dtype=torch.float)
-#             xjs = model( x2_raw)
-#             xis = nn.functional.normalize(xis, dim=1)
-#             xjs = nn.functional.normalize(xjs, dim=1)
-#             embeddings = torch.cat([xis, xjs], dim=0)
-#             labels = torch.cat([torch.arange(xis.shape[0]), ] * 2)
-#             loss = criterion(embeddings, labels)
-#             l1_reg = enc_l1_ * torch.norm(embeddings, p=1, dim=1).mean()
-#             loss += l1_reg
-#
-#             test_loss += loss.item() / len(encoder_test_loader)
-#             # metrics = calculator.get_accuracy(xis.cpu().detach().numpy(), xjs.cpu().detach().numpy(),
-#             #                                   np.arange(xis.shape[0]), np.arange(xis.shape[0]),
-#             #                                   False)
-#
-#
-#     print("Epoch: %d: loss %.3f, val_loss %.3f" % (epoch, train_loss, test_loss))
-#     losses_.append((train_loss, test_loss))
-#     scheduler.step(test_loss)
-#     if test_loss < best_model['loss']:
-#         best_model['loss']=test_loss
-#         best_model['params']=copy.deepcopy(model.state_dict())
-#         best_model['epoch']=epoch
-#         early_stop_counter=0
-#     else:
-#         early_stop_counter+=1
-#         if early_stop_counter>=70:
-#             print("Early stopping ...")
-#             break
-
-
-
-# torch.save(best_model['params'],weights_file)
-#
-# fig,ax=plt.subplots(1)
-# ax.plot([train for train, test in losses_],label="train")
-# ax.plot([test for train, test in losses_],label="test")
-# ax.set_ylim(0,3)
-# plt.legend()
-# plt.savefig("/home/pmwaniki/Dropbox/tmp/simclr_%s__lr%.5f_l2%.5f__size%d.png" % (os.uname()[1],enc_lr_,enc_l2_,enc_representation_size))
-# if display:
-#     plt.show()
-# else:
-#     plt.close()
-#
-#
-# model.load_state_dict(best_model['params'])
-#
-# best_trained_model.fc=nn.Identity()
-# best_trained_model.eval()
-#
-# classifier_embedding=[]
-# with torch.no_grad():
-#     for x1_raw in tqdm(classifier_train_loader):
-#         x1_raw = x1_raw.to(device, dtype=torch.float)
-#         xis = best_trained_model( x1_raw)
-#         xis=nn.functional.normalize(xis,dim=1)
-#         classifier_embedding.append(xis.cpu().detach().numpy())
-#
-# test_embedding=[]
-# with torch.no_grad():
-#     for x1_raw in tqdm(classifier_test_loader):
-#         x1_raw = x1_raw.to(device, dtype=torch.float)
-#         xis = best_trained_model( x1_raw)
-#         xis = nn.functional.normalize(xis, dim=1)
-#         test_embedding.append(xis.cpu().detach().numpy())
-#
-# classifier_embedding=np.concatenate(classifier_embedding)
-# test_embedding=np.concatenate(test_embedding)
-# test_identifier=test['id']
-# subject_embeddings=[]
-# subject_ids=[]
-# subject_admitted=[]
-# for id in test_identifier.unique():
-#     temp_=test_embedding[test_identifier==id]
-#     subject_embeddings.append(temp_.mean(axis=0))
-#     subject_ids.append(id)
-#     subject_admitted.append(test.loc[test['id']==id,'admitted'].iloc[0])
-#
-#
-# subject_embeddings=np.stack(subject_embeddings)
-# scl=StandardScaler()
-# subject_scl=scl.fit_transform(subject_embeddings)
-# pca=PCA(n_components=6)
-# subject_pca=pca.fit_transform(subject_scl)
-# subject_admitted=np.array(subject_admitted)
-#
-#
-#
-#
-# fig,axs=plt.subplots(3,5,figsize=(15,10))
-# for ax,vals in zip(axs.flatten(),itertools.combinations(range(6),2)):
-#     r,c=vals
-#     ax.scatter(subject_pca[subject_admitted == 0, r], subject_pca[subject_admitted == 0, c],
-#                                           marker="o", label="No",
-#                                           alpha=0.5)
-#     ax.scatter(subject_pca[subject_admitted == 1, r], subject_pca[subject_admitted == 1, c],
-#                                           marker="o", label="Yes",
-#                                           alpha=0.5)
-#     ax.set_xlabel(f"PCA {r + 1}")
-#     ax.set_ylabel(f"PCA {c + 1}")
-#     ax.set_xticks([])
-#     ax.set_yticks([])
-#
-# plt.savefig(f"/home/pmwaniki/Dropbox/tmp/triplet_embedding_lr{enc_lr_}_l2{enc_l2_}_size{enc_representation_size}.png")
-# if display:
-#     plt.show(block=False)
-# else:
-#     plt.close()
-#
-#
-# scl=StandardScaler()
-# scl_classifier_embedding=scl.fit_transform(classifier_embedding)
-# scl_test_embedding=scl.transform(test_embedding)
-
-# pca=PCA(n_components=6)
-# train_pca=pca.fit_transform(scl_classifier_embedding)
-# test_pca=pca.transform(scl_test_embedding)
-
-
-
-
-# base_clf=SVC(probability=True,class_weight='balanced')
-# tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-2,1e-2,1e-3, 1e-4],
-#                      'C': [1, 10, 100, 1000]},
-#                     {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
-
-# base_clf=LogisticRegression(class_weight='balanced',max_iter=10000,penalty='l2')
-# base_clf=Pipeline([
-#     ('scl',StandardScaler()),
-#     ('pca',PCA()),
-#     ('clf',LogisticRegression(class_weight='balanced',max_iter=100000,penalty='elasticnet',solver='saga')),
-# ])
-# tuned_parameters = { 'clf__C': [1e-3,1e-2,1e-1,1,],
-#                      'pca__n_components':[int(enc_representation_size/2**i) for i in range(5)],
-#                      'clf__l1_ratio':[0.2,0.5,0.8]}
-#
-# clf=GridSearchCV(base_clf,param_grid=tuned_parameters,cv=StratifiedKFold(10,),
-#                  verbose=1,n_jobs=10,
-#                  scoring=['f1','roc_auc','recall','precision'],refit='roc_auc')
-# clf.fit(classifier_embedding,train['admitted'])
-#
-# cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_results_['mean_test_roc_auc'],
-#               'f1':clf.cv_results_['mean_test_f1'],'recall':clf.cv_results_['mean_test_recall'],
-#                           'precision':clf.cv_results_['mean_test_precision']})
-# print(cv_results)
-#
-# test_pred=clf.predict_proba(test_embedding)[:,1]
-#
-# print(classification_report(test['admitted'],test_pred>0.5))
-# print("AUC: ",roc_auc_score(test['admitted'],test_pred))
-#
-# final_predictions=pd.DataFrame({'admitted':test['admitted'],
-#                                  'id':test['id'],
-#                                  'prediction':test_pred})
-# final_predictions2=final_predictions.groupby('id').agg('mean')
-# print(classification_report(final_predictions2['admitted'],(final_predictions2['prediction']>0.5)*1.0))
-#
-# print("AUC: %.2f" % roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction']))
-#
-#
-# report=classification_report(final_predictions2['admitted'],(final_predictions2['prediction']>0.5)*1.0,output_dict=True)
-# recall=report['1.0']['recall']
-# precision=report['1.0']['precision']
-# f1=report['1.0']['f1-score']
-# specificity=report['0.0']['recall']
-# acc=report['accuracy']
-# auc=roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction'])
-#
-#
-#
-# save_table3(model="Triplet",precision=precision,recall=recall,specificity=specificity,
-#             auc=auc,details=details_,other=json.dumps({'host':os.uname()[1],'f1':f1,
-#                                                        'acc':acc,'batch_size':enc_batch_size}))
-#
-# joblib.dump(clf,weights_file.replace(".pt",".joblib"))
-
-# def train_fun(config,checkpoint_dir=None):
-#     encoder_train_dataset=TriagePairs(train_encoder, id_var="id", stft_fun=None,
-#                             transforms=None,
-#                             # aug_raw=aug_raw,normalize=True
-#                             )
-#     device = "cuda" if torch.cuda.is_available() else "cpu"
-#     base_model = resnet1d(num_classes=512)
-#
-#     model = EncoderRaw(base_model, representation_size=config['representation_size'],
-#                        dropout=config['dropout'], num_classes=config['enc_output_size'])
-#
-#     test_abs = int(len(encoder_train_dataset) * 0.9)
-#     train_ds,val_ds=random_split(encoder_train_dataset,lengths=[test_abs,len(encoder_train_dataset)-test_abs])
-#
-#     train_loader=DataLoader(train_ds,
-#                             batch_size=int(config["batch_size"]),
-#                             shuffle=True, num_workers=50)
-#     val_loader=DataLoader(val_ds,
-#                             batch_size=int(config["batch_size"]),
-#                             shuffle=False, num_workers=50)
-#     model = model.to(device)
-#     optimizer = torch.optim.Adam(params=model.parameters(), lr=config['enc_lr'], weight_decay=config['enc_l2'])
-#     if checkpoint_dir:
-#         model_state, optimizer_state = torch.load(
-#             os.path.join(checkpoint_dir, "checkpoint.pth"))
-#         model.load_state_dict(model_state)
-#         optimizer.load_state_dict(optimizer_state)
-#     # optimizer=torch.optim.SGD(params=model.parameters(),lr=enc_lr_ ,weight_decay=enc_l2_,momentum=0.99)
-#     # criterion=losses.TripletMarginLoss(margin=2.0).to(device)
-#     criterion = losses.NTXentLoss(temperature=config['enc_temp'],
-#                                   # distance=distances.LpDistance(normalize_embeddings=False),
-#                                   distance=distances.DotProductSimilarity(normalize_embeddings=False),
-#                                   ).to(device)
-#     # calculator = AccuracyCalculator(k=1)
-#     epochs = 600
-#     scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=10, verbose=True, min_lr=1e-6)
-#
-#     for epoch in range(0, epochs):
-#         train_loss = 0
-#
-#         model.train()
-#         # print("epoch: %d >> learning rate at beginning of epoch: %.5f" % (epoch, optimizer.param_groups[0]['lr']))
-#         for x1_raw, x2_raw in train_loader:
-#             x1_raw = x1_raw.to(device, dtype=torch.float)
-#             xis = model(x1_raw)
-#             x2_raw = x2_raw.to(device, dtype=torch.float)
-#             xjs = model(x2_raw)
-#             xis = nn.functional.normalize(xis, dim=1)
-#             xjs = nn.functional.normalize(xjs, dim=1)
-#             embeddings = torch.cat([xis, xjs], dim=0)
-#             labels = torch.cat([torch.arange(xis.shape[0]), ] * 2).to(device)
-#             loss = criterion(embeddings, labels)
-#             l1_reg = config['enc_l1'] * torch.norm(embeddings, p=1, dim=1).mean()
-#             loss += l1_reg
-#             optimizer.zero_grad()
-#             loss.backward()
-#             optimizer.step()
-#             train_loss += loss.item() / len(train_loader)
-#             # metrics=calculator.get_accuracy(xis.cpu().detach().numpy(),xjs.cpu().detach().numpy(),
-#             #                         np.arange(xis.shape[0]),np.arange(xis.shape[0]),
-#             #                         False)
-#
-#         model.eval()
-#         val_loss = 0
-#         xis_embeddings=[]
-#         xjs_embeddings=[]
-#         with torch.no_grad():
-#             for x1_raw, x2_raw in val_loader:
-#                 x1_raw = x1_raw.to(device, dtype=torch.float)
-#                 xis = model(x1_raw)
-#                 x2_raw = x2_raw.to(device, dtype=torch.float)
-#                 xjs = model(x2_raw)
-#                 xis = nn.functional.normalize(xis, dim=1)
-#                 xjs = nn.functional.normalize(xjs, dim=1)
-#                 embeddings = torch.cat([xis, xjs], dim=0)
-#                 labels = torch.cat([torch.arange(xis.shape[0]), ] * 2)
-#                 loss = criterion(embeddings, labels)
-#                 l1_reg = config['enc_l1'] * torch.norm(embeddings, p=1, dim=1).mean()
-#                 loss += l1_reg
-#
-#                 val_loss += loss.item() / len(val_loader)
-#                 xis_embeddings.append(xis.cpu().detach().numpy())
-#                 xjs_embeddings.append(xjs.cpu().detach().numpy())
-#                 # metrics = calculator.get_accuracy(xis.cpu().detach().numpy(), xjs.cpu().detach().numpy(),
-#                 #                                   np.arange(xis.shape[0]), np.arange(xis.shape[0]),
-#                 #                                   False)
-#             xis_embeddings=np.concatenate(xis_embeddings)
-#             xjs_embeddings=np.concatenate(xjs_embeddings)
-#             accuracy=test(xis_embeddings,xjs_embeddings)
-#
-#         # scheduler.step(val_loss)
-#
-#         with tune.checkpoint_dir(99) as checkpoint_dir:
-#             path = os.path.join(checkpoint_dir, "checkpoint.pth")
-#             torch.save((model.state_dict(), optimizer.state_dict()), path)
-#         tune.report(loss=val_loss, accuracy=accuracy)
-#
-#     print("Finished Training")
