@@ -35,7 +35,7 @@ from pytorch_metric_learning import distances,regularizers,losses,testers
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 
 import ray
-ray.init( num_cpus=10)
+ray.init( num_cpus=12,dashboard_host="0.0.0.0")
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler,HyperBandScheduler,AsyncHyperBandScheduler
@@ -55,23 +55,9 @@ enc_representation_size="32"
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
-experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}"
-# enc_output_size=64
-# enc_batch_size=64
-# enc_temp = 0.05
-# weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
-#
-# fs=Fs
-#
-# slice_sec=2.5
-# slide_sec=0.2
-#
-#
-#
-# nperseg=int(slice_sec*fs)
-# step=int(slide_sec*fs)
-# noverlap=nperseg-step
-#
+experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}c"
+
+
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
 # details_=f"z{enc_representation_size}_l2{enc_l2_}_x{enc_output_size}_lr{enc_lr_}_bs{enc_batch_size}"
 #
@@ -310,19 +296,20 @@ class Trainer(tune.Trainable):
 
 
 configs = {
-    'dropout':tune.loguniform(0.0001,0.5),
+    'dropout':tune.loguniform(0.01,0.5),
     'enc_output_size':tune.choice([32,]),
     'representation_size':tune.choice([32,]),
     'batch_size':tune.choice([8,16,32,64,128]),
     'enc_temp':tune.loguniform(0.0001,0.5),
-    'enc_lr':tune.loguniform(0.00001,0.01),
-    'enc_l2':tune.loguniform(0.0000001,0.05),
+    'enc_lr':tune.loguniform(0.00001,1.0),
+    'enc_l2':tune.loguniform(0.00001,1.0),
     # 'enc_l1':tune.loguniform(0.000001,0.05),
     'aug_gaus':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
     'aug_num_seg':tune.choice([2,5,10,20,40,80]),
     'aug_prop_seg':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
 
 }
+
 config={i:v.sample() for i,v in configs.items()}
 
 scheduler = ASHAScheduler(
@@ -349,7 +336,7 @@ if __name__=="__main__":
         # metric='loss',
         # mode='min',
         checkpoint_at_end=True,
-        resources_per_trial={"cpu": 5, "gpu": 0.2},
+        resources_per_trial={"cpu": 2, "gpu": 0.2},
         config=configs,
         local_dir=os.path.join(log_dir, "contrastive"),
         num_samples=500,
