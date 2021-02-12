@@ -316,7 +316,7 @@ scheduler = ASHAScheduler(
         metric="loss",
         mode="min",
         max_t=700,
-        grace_period=5,
+        grace_period=10,
         reduction_factor=2)
 # scheduler=AsyncHyperBandScheduler(
 #         time_attr="training_iteration",
@@ -326,7 +326,7 @@ scheduler = ASHAScheduler(
 #         max_t=700)
 # scheduler = HyperBandScheduler(metric="loss", mode="min")
 
-if __name__=="__main__":
+if __name__ == "__main__":
 
     reporter = CLIReporter(
         # parameter_columns=["l1", "l2", "lr", "batch_size"],
@@ -344,7 +344,7 @@ if __name__=="__main__":
         # resume=True,
         scheduler=scheduler,
         progress_reporter=reporter,
-        # sync_to_driver=False,
+        reuse_actors=True,
         raise_on_failed_trial=False)
 
     df = result.results_df
