@@ -260,20 +260,22 @@ class Trainer(tune.Trainable):
 
     def save_checkpoint(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        torch.save(self.model.state_dict(), checkpoint_path)
+        torch.save((self.model.state_dict(),self.optimizer.state_dict()), checkpoint_path)
         return checkpoint_path
 
     def load_checkpoint(self, checkpoint_path):
-        self.model.load_state_dict(torch.load(checkpoint_path))
+        model_state,optimizer_state=torch.load(checkpoint_path)
+        self.model.load_state_dict(model_state)
+        self.optimizer.load_state_dict(optimizer_state)
 
 
 configs = {
-    'dropout':tune.loguniform(0.0001,0.5),
+    'dropout':tune.loguniform(0.01,0.5),
     'representation_size':tune.choice([32,]),
     'batch_size':tune.choice([8,16,32,64,128]),
     'pos_weight':tune.choice([1.0,3.0,5.0,10.0]),
-    'enc_lr':tune.loguniform(0.00001,0.01),
-    'enc_l2':tune.loguniform(0.0000001,0.05),
+    'enc_lr':tune.loguniform(0.00001,1.0),
+    'enc_l2':tune.loguniform(0.00001,1.0),
     'aug_gaus':tune.choice([0,0.2,0.5,0.8,1.0]),
     'aug_num_seg':tune.choice([2,5,10,20,40,80]),
     'aug_prop_seg':tune.choice([0.05,0.1,0.3,0.5,0.9]),
@@ -313,7 +315,7 @@ if __name__=="__main__":
         resume=False,
         scheduler=scheduler,
         progress_reporter=reporter,
-        # sync_to_driver=False,
+        reuse_actors=True,
         raise_on_failed_trial=False)
     df = result.results_df
     # df.to_csv(os.path.join(data_dir, "results/hypersearch.csv"), index=False)
