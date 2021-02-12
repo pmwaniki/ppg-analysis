@@ -97,7 +97,7 @@ grid_parameters = {
     'clf__lr':[0.01,0.001,0.0001,0.00001],
     'clf__criterion__pos_weight':[torch.tensor(3.0)],
     'clf__optimizer__weight_decay':[1e-6,0.00001,0.0001,0.001,0.01,0.1],
-    'clf__optimizer__momentum':[0.9,],
+    'clf__optimizer__momentum':[0.9,0.99],
     # 'clf__batch_size':[32,64,128,256],
     'clf__max_epochs':[300,500,750,1000,2000,5000],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
@@ -137,26 +137,20 @@ cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_result
                          'f1':clf.cv_results_['mean_test_f1']})
 print(cv_results)
 
-test_pred=clf.predict_proba(test_embedding)[:,1]
+test_pred=clf.predict_proba(test_embedding_reduced)[:,1]
 
-print(classification_report(test['admitted'],test_pred>0.5))
-print("AUC: ",roc_auc_score(test['admitted'],test_pred))
+print(classification_report(admitted_test,test_pred>0.5))
+print("AUC: ",roc_auc_score(admitted_test,test_pred))
 
-final_predictions=pd.DataFrame({'admitted':test['admitted'],
-                                 'id':test['id'],
-                                 'prediction':test_pred})
-final_predictions2=final_predictions.groupby('id').agg('mean')
-print(classification_report(final_predictions2['admitted'],(final_predictions2['prediction']>0.5)*1.0))
 
-print("AUC: %.2f" % roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction']))
 
-report=classification_report(final_predictions2['admitted'],(final_predictions2['prediction']>0.5)*1.0,output_dict=True)
+report=classification_report(admitted_test,(test_pred>0.5)*1.0,output_dict=True)
 recall=report['1.0']['recall']
 precision=report['1.0']['precision']
 f1=report['1.0']['f1-score']
 specificity=report['0.0']['recall']
 acc=report['accuracy']
-auc=roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction'])
+auc=roc_auc_score(admitted_test,test_pred)
 save_table3(model="Contrastive",precision=precision,recall=recall,specificity=specificity,
             auc=auc,details=experiment,other=json.dumps({'host':os.uname()[1],'f1':f1,
                                                        'acc':acc}))

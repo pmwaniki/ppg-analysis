@@ -45,8 +45,13 @@ base_clf=SGDClassifier(loss='modified_huber',
                        class_weight='balanced',
                        penalty='l2',
                        early_stopping=False,
+<<<<<<< Updated upstream
 #                        validation_fraction=0.05,n_iter_no_change=20,
                        max_iter=100,random_state=123)
+=======
+                       # n_iter_no_change=20,
+                       max_iter=500,random_state=123)
+>>>>>>> Stashed changes
 # base_clf=LogisticRegression(
 #     # penalty='elasticnet',
 #     max_iter=500000,
@@ -68,7 +73,11 @@ grid_parameters = {
 #     'clf__loss': ['modified_huber'],
 #     'clf__learning_rate': [ 'adaptive',],
     'poly__degree': [2, ],
+<<<<<<< Updated upstream
     'poly__interaction_only': [ False,],
+=======
+    'poly__interaction_only': [False,],
+>>>>>>> Stashed changes
     'select__percentile': [10, 15, 20, 30, 40, 60, 70,100],
 #     'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],

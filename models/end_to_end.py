@@ -35,7 +35,7 @@ from pytorch_metric_learning import distances,regularizers,losses,testers
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 
 import ray
-ray.init( num_cpus=10)
+ray.init( num_cpus=12,dashboard_host="0.0.0.0")
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler,HyperBandScheduler,AsyncHyperBandScheduler
@@ -305,12 +305,12 @@ if __name__=="__main__":
         # metric='loss',
         # mode='min',
         checkpoint_at_end=True,
-        resources_per_trial={"cpu": 10, "gpu": 1},
+        resources_per_trial={"cpu": 2, "gpu": 0.15},
         config=configs,
         local_dir=os.path.join(log_dir, "Supervised"),
-        num_samples=700,
+        num_samples=500,
         name=experiment,
-        # resume=False,
+        resume=False,
         scheduler=scheduler,
         progress_reporter=reporter,
         # sync_to_driver=False,

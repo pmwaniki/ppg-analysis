@@ -118,10 +118,12 @@ if __name__ == "__main__":
     segments.delete_many({})
     low_sqi_segments=0
     segment_data=[]
+    signal_lengths=[]
     for id in ids:
         trend_data = pd.read_csv(trend_filnames[id], skiprows=1)
         red_sig = read_float(red_filenames[id])
         infrared_sig = read_float(infrared_filnames[id])
+        signal_lengths.append((len(red_sig),len(infrared_sig)))
         if (len(red_sig)< 1000) | (len(infrared_sig)< 1000):
             print("record %s has insuffient samples. skiping ..." % id)
             continue

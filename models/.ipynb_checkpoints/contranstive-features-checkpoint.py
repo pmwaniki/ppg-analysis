@@ -1,13 +1,14 @@
 import os,json
+
 import sys
-sys.path.append('/')
+sys.path.append('/home/pmwaniki/Dropbox/PhD/ppg/ppg-analysis')
+from settings import checkpoint_dir as log_dir,data_dir,weights_dir,base_dir
 import itertools
 from tqdm import tqdm
 import joblib
 import numpy as np
 import pandas as pd
-from ray import tune
-from ray.tune.analysis.experiment_analysis import ExperimentAnalysis,Analysis
+from ray.tune.analysis.experiment_analysis import Analysis
 import glob
 
 import torch
@@ -16,23 +17,21 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler,QuantileTransformer
+from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
-from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
-from sklearn.impute import SimpleImputer
 from sklearn.compose import TransformedTargetRegressor
 
 from datasets.loaders import TriageDataset,TriagePairs
 from utils import save_table3
-from settings import checkpoint_dir as log_dir,data_dir,weights_dir
+
 
 from models.contrastive_resnet import get_model,accuracy_fun
 
 display=os.environ.get("DISPLAY",None)
-experiment="Contrastive-LpDistance"
+experiment="Contrastive-sample-DotProduct32"
 trial_dir=os.path.join(log_dir,"contrastive",experiment)
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}.pt")
 
@@ -46,22 +45,24 @@ train_encoder_ids=np.random.choice(train_ids,size=660,replace=False)
 #
 #
 train=triage_segments[triage_segments['id'].isin(train_ids)]
+train_full=train.copy()
 # non_repeated_ids = [k for k, v in train['id'].value_counts().items() if v <= 15]
 # train = train[~train['id'].isin(non_repeated_ids)]  # remove non repeating ids
 # train_encoder = train[train['id'].isin(train_encoder_ids)]
 
 
 test=triage_segments[triage_segments['id'].isin(test_ids)]
+test_full=test.copy()
 non_repeated_test_ids = [k for k, v in test['id'].value_counts().items() if v <= 15]
 test_encoder = test[~test['id'].isin(non_repeated_test_ids)]
 
 encoder_test_dataset = TriagePairs(test_encoder, id_var="id", stft_fun=None, aug_raw=[],normalize=True)
 encoder_test_loader = DataLoader(encoder_test_dataset, batch_size=16, shuffle=False, num_workers=5)
 #
-classifier_train_dataset=TriageDataset(train,normalize=True)
+classifier_train_dataset=TriageDataset(train_full,normalize=True)
 classifier_train_loader=DataLoader(classifier_train_dataset,batch_size=16,shuffle=False,num_workers=5)
 
-classifier_test_dataset=TriageDataset(test,normalize=True)
+classifier_test_dataset=TriageDataset(test_full,normalize=True)
 classifier_test_loader=DataLoader(classifier_test_dataset,batch_size=16,shuffle=False,num_workers=5)
 
 analysis=Analysis(trial_dir)
@@ -72,19 +73,20 @@ best_dir=analysis.get_best_logdir(score,mode)
 best_data=analysis.dataframe(score,mode)
 best_config=analysis.get_best_config(score,mode)
 
+device="cuda" if torch.cuda.is_available() else "cpu"
 model_path=glob.glob1(best_dir,"checkpoint_*")[-1]
-model_state=torch.load(os.path.join(best_dir,model_path,"model.pth"))
+model_state,optimizer_state=torch.load(os.path.join(best_dir,model_path,"model.pth"),map_location=device)
 torch.save(model_state,weights_file)
 
-device="cuda" if torch.cuda.is_available() else "cpu"
+
 # device="cpu"
 # best_config={'representation_size':64,'dropout':0.0,'enc_output_size':32}
 # model_state=torch.load("/home/pmwaniki/data/ppg/results/weights/Contrastive_Contrastive-DotProduct.pt")
-model=get_model(best_config).to(device)
+model=get_model(best_config)
 
 
 model.load_state_dict(model_state)
-model=model.to(device)
+model.to(device)
 # Test model accuracy
 model.eval()
 xis_embeddings = []
@@ -97,7 +99,6 @@ with torch.no_grad():
         xjs = model(x2_raw)
         xis = nn.functional.normalize(xis, dim=1)
         xjs = nn.functional.normalize(xjs, dim=1)
-
         xis_embeddings.append(xis.cpu().detach().numpy())
         xjs_embeddings.append(xjs.cpu().detach().numpy())
 
@@ -126,6 +127,10 @@ with torch.no_grad():
 
 classifier_embedding=np.concatenate(classifier_embedding)
 test_embedding=np.concatenate(test_embedding)
+
+joblib.dump((classifier_embedding,test_embedding,train,test),
+            os.path.join(data_dir,f"results/{experiment}.joblib"))
+
 test_identifier=test['id']
 subject_embeddings=[]
 subject_ids=[]
@@ -186,11 +191,11 @@ base_clf=SVC(probability=True,class_weight='balanced')
 tuned_parameters = [
     {'clf__kernel': ['rbf'], 'clf__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1],
 #                      'pca__n_components':[int(64/2**i) for i in range(5)],
-     'clf__C': [1, 10, 100, 1000]
+     'clf__C': [0.01,0.1,1, 10, 100, 1000,1e4]
     },
-#                     {'clf__kernel': ['linear'], 'clf__C': [1, 10, 100, 1000],
-# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
-#                     }
+                    {'clf__kernel': ['linear'], 'clf__C': [1, 10, 100, 1000],
+#                      'pca__n_components':[int(64/2**i) for i in range(5)],
+                    }
                    ]
 
 # base_clf=LogisticRegression(class_weight='balanced',max_iter=1000,penalty='elasticnet',solver='saga')
@@ -202,7 +207,7 @@ tuned_parameters = [
 #                      'clf__l1_ratio':[0.2,0.5,0.8]}
 
 pipeline=Pipeline([
-    ('scl',StandardScaler()),
+    ('scl',RobustScaler()),
 #     ('pca',PCA()),
     ('clf',base_clf),
 ])
@@ -256,25 +261,25 @@ q_y_train=q_transformer.fit_transform(y_train)
 
 base_clf_resp=SVR()
 tuned_parameters_resp = [
-    {'clf__regressor__kernel': ['rbf'], 'clf__regressor__gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1,1.0,10.0],
+    {'clf__regressor__kernel': ['rbf'], 'clf__regressor__gamma': [0.00001,0.00005,0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1,1.0],
 #                      'pca__n_components':[int(64/2**i) for i in range(5)],
      'clf__regressor__C': [1, 1e1, 1e2, 1e3,1e4,1e5]
     },
-                    {'clf__regressor__kernel': ['linear'], 'clf__regressor__C': [1, 10, 100, 1000,1e4,1e5],
-#                      'pca__n_components':[int(64/2**i) for i in range(5)],
-                    }
+#                     {'clf__regressor__kernel': ['linear'], 'clf__regressor__C': [1, 10, 100, 1000,1e4,1e5],
+# #                      'pca__n_components':[int(64/2**i) for i in range(5)],
+#                     }
                    ]
 
 
 pipeline_resp=Pipeline([
-    ('scl',StandardScaler()),
+    ('scl',RobustScaler()),
 #     ('pca',PCA()),
     ('clf',TransformedTargetRegressor(regressor=base_clf_resp,transformer=q_transformer)),
 ])
 
 clf_resp=RandomizedSearchCV(pipeline_resp,param_distributions=tuned_parameters_resp,
-                            cv=KFold(10,shuffle=False),
-                 verbose=1,n_jobs=10,n_iter=250,
+                            cv=KFold(5,shuffle=False),
+                 verbose=1,n_jobs=10,n_iter=25,
                  scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],refit='neg_root_mean_squared_error')
 # clf_resp.fit(classifier_embedding[~train['resp_rate'].isna()],train.loc[~train['resp_rate'].isna(),'resp_rate'])
 clf_resp.fit(classifier_embedding[~train['resp_rate'].isna()],y_train[~train['resp_rate'].isna()])
@@ -289,8 +294,12 @@ print(cv_results_resp)
 
 test_pred_resp=clf_resp.predict(test_embedding)
 r2=r2_score(test.loc[~test['resp_rate'].isna(),'resp_rate'],test_pred_resp[~test['resp_rate'].isna()])
-rmse=mean_squared_error(test['resp_rate'],test_pred_resp,squared=False)
+rmse=mean_squared_error(test.loc[~test['resp_rate'].isna(),'resp_rate'],test_pred_resp[~test['resp_rate'].isna()],squared=False)
 
 fig2,ax2=plt.subplots(1)
 ax2.scatter(test['resp_rate'],test_pred_resp)
+ax2.plot([20,100],[20,100])
+ax2.set_xlabel("Observed")
+ax2.set_ylabel("Predicted")
+fig2.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_resp_rate_{os.uname()[1]}_{experiment}.png")
 plt.show()

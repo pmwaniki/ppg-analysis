@@ -23,7 +23,7 @@ from settings import data_dir
 import itertools
 
 
-experiment="Contrastive-sample-DotProduct32"
+experiment="Contrastive-sample-DotProduct32b"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
@@ -149,10 +149,10 @@ fig, axs=plt.subplots(1,3,figsize=(12,4))
 # plot_embedding(X_tsne,subject_died,title="Death")
 # plt.show()
 
-plot_embedding2(X_tsne,subject_resp_rate,title="Respiratory rate",ax=axs[0])
+plot_embedding2(X_tsne,subject_resp_rate,title="Respiratory rate",ax=axs[1])
 # plt.show()
 
-plot_embedding2(X_tsne,subject_hr,title="Heart rate",ax=axs[1])
+plot_embedding2(X_tsne,subject_hr,title="Heart rate",ax=axs[0])
 # plt.show()
 
 plot_embedding2(X_tsne,subject_spo2,title="SPO2",ax=axs[2])

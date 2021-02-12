@@ -5,6 +5,9 @@ import json
 import pandas as pd
 
 import sqlite3
+from settings import base_dir
+
+database_file=os.path.join(base_dir,"results.db")
 
 
 
@@ -14,7 +17,7 @@ import sqlite3
 
 
 def create_table3():
-    conn=sqlite3.connect("results.db")
+    conn=sqlite3.connect(database_file)
     c=conn.cursor()
     c.execute("""
     CREATE TABLE IF NOT EXISTS table3 (
@@ -35,7 +38,7 @@ def create_table3():
 def save_table3(model,precision,recall,specificity,auc,details,other=None):
     create_table3()
 
-    conn = sqlite3.connect("results.db")
+    conn = sqlite3.connect(database_file)
     c = conn.cursor()
     c.execute("""
                     INSERT OR REPLACE INTO table3 (

@@ -43,7 +43,22 @@ orient='h',data=triage_data2)
 plt.show()
 
 
-temp_data=triage_data[['Study No','Sex','Age (years)','Fever']].head()
-temp_data=temp_data.to_latex(index=False)
-with open("/tmp/triage_data.tex","w") as f:
-    f.write(temp_data)
+# AGE IN MONTHS
+def cal_age_months(age_years,age_months,age_days):
+    if np.isnan(age_years) & np.isnan(age_months) & np.isnan(age_days):
+        return np.nan
+    age_years=age_years if not np.isnan(age_years) else 0.0
+    age_months = age_months if not np.isnan(age_months) else 0.0
+    age_days = age_days if not np.isnan(age_days) else 0.0
+    return age_years*12.0 + age_months + age_days/30
+
+
+triage_data['age_months']=triage_data.apply(lambda row: cal_age_months(row['Age (years)'],row['Age (months)'],row['Age (Days)']),axis=1)
+# triage_data[['Age (years)','Age (months)','Age (Days)','age_months']].head(10)
+
+np.quantile(triage_data['age_months'],q=(0.25,0.5,0.75))
+
+
+#SQI
+
+triage_data['SQI'].quantile(q=(0.25,0.5,0.75))

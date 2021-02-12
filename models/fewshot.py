@@ -110,6 +110,12 @@ grid = {"clf__estimator__max_depth": [3,5,8, None],
 clf_lr=GridSearchCV(rfe,param_grid=grid,cv=10,n_jobs=-1,scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',)
 clf_lr.fit(classifier_embedding_reduced,admitted_train)
 
+
+cv_results=pd.DataFrame({'params':clf_lr.cv_results_['params'], 'auc':clf_lr.cv_results_['mean_test_roc_auc'],
+              'acc':clf_lr.cv_results_['mean_test_balanced_accuracy'],'recall':clf_lr.cv_results_['mean_test_recall'],
+                          'precision':clf_lr.cv_results_['mean_test_precision'],
+                         'f1':clf_lr.cv_results_['mean_test_f1']})
+
 test_pred=clf_lr.predict_proba(test_embedding)[:,1]
 
 print(classification_report(test['admitted'],test_pred>0.5))
