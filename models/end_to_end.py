@@ -51,7 +51,7 @@ display=os.environ.get('DISPLAY',None) is not None
 enc_representation_size="32"
 # enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 # distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
-experiment=f"Supervised-{enc_representation_size}"
+experiment=f"Supervised-{enc_representation_size}b"
 # enc_output_size=64
 # enc_batch_size=64
 # enc_temp = 0.05
@@ -197,7 +197,7 @@ def get_model(config):
 def get_optimizer(config,model):
     optimizer = torch.optim.Adam(params=model.parameters(),
                                  lr=config['enc_lr'],
-                                 weight_decay=config['enc_l2'])
+                                 weight_decay=config['enc_l2'],betas=(0.99,0.999))
     return optimizer
 
 
@@ -206,7 +206,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 
-def train_fun(model,optimizer,criterion,device,train_loader,val_loader):
+def train_fun(model,optimizer,criterion,device,train_loader,val_loader,scheduler):
     train_loss = 0
 
     model.train()
@@ -237,6 +237,7 @@ def train_fun(model,optimizer,criterion,device,train_loader,val_loader):
             val_loss += loss.item() / len(val_loader)
             pred_val.append(logits.sigmoid().squeeze().cpu().numpy().reshape(-1))
             obs_val.append(batch_y.squeeze().cpu().numpy().reshape(-1))
+    scheduler.step(val_loss)
     pred_val = np.concatenate(pred_val)
     obs_val = np.concatenate(obs_val)
     f1 = f1_score(obs_val,(pred_val>0.5)*1.0)
@@ -250,12 +251,13 @@ class Trainer(tune.Trainable):
         self.optimizer=get_optimizer(config,self.model)
 
         self.criterion=nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config['pos_weight'])).to(device)
+        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,patience=10,min_lr=1e-6)
         self.train_loader,self.val_loader=get_loader(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def step(self):
         train_loss,loss,f1,auc=train_fun(self.model,self.optimizer,self.criterion,
-                            self.device,self.train_loader,self.val_loader)
+                            self.device,self.train_loader,self.val_loader,self.scheduler)
         return {'loss':loss,'f1':f1,'auc':auc,'train_loss':train_loss}
 
     def save_checkpoint(self, checkpoint_dir):
@@ -274,8 +276,8 @@ configs = {
     'representation_size':tune.choice([32,]),
     'batch_size':tune.choice([8,16,32,64,128]),
     'pos_weight':tune.choice([1.0,3.0,5.0,10.0]),
-    'enc_lr':tune.loguniform(0.00001,1.0),
-    'enc_l2':tune.loguniform(0.00001,1.0),
+    'enc_lr':tune.loguniform(0.00001,0.1),
+    'enc_l2':tune.loguniform(0.00001,0.5),
     'aug_gaus':tune.choice([0,0.2,0.5,0.8,1.0]),
     'aug_num_seg':tune.choice([2,5,10,20,40,80]),
     'aug_prop_seg':tune.choice([0.05,0.1,0.3,0.5,0.9]),
