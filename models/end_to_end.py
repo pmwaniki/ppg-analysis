@@ -174,12 +174,19 @@ def get_loader(config):
                                         normalize=True
                                         )
 
+    # sample weights
+    class_sample_count = np.array(
+        [len(np.where(train_csv['admitted'] == t)[0]) for t in np.unique(train_csv['admitted'])])
+    weight = 1. / class_sample_count
+    samples_weight = np.array([weight[int(t)] for t in train_csv['admitted']])
 
-
+    samples_weight = torch.from_numpy(samples_weight)
+    samples_weight = samples_weight.double()
+    sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
     train_loader = DataLoader(train_ds,
                               batch_size=int(config["batch_size"]),
-                              shuffle=True, num_workers=50)
+                              shuffle=False,sampler=sampler, num_workers=50)
     val_loader = DataLoader(val_ds,
                             batch_size=int(config["batch_size"]),
                             shuffle=False, num_workers=50)
