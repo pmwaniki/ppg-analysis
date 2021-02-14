@@ -18,7 +18,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
-from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile
+from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from settings import data_dir,weights_dir
@@ -60,12 +60,12 @@ regressor_hr=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=Tru
 hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
                 'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
          'poly__degree':[2,],
-         'poly__interaction_only':[True,False],
+         'poly__interaction_only':[False],
          'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
-         'select__score_func':[mutual_info_regression,f_regression]
+         'select__score_func':[mutual_info_regression,]
         }
 pipeline_hr = Pipeline([
-
+    ('variance_threshold',VarianceThreshold()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
     ('scl', StandardScaler()),
@@ -75,9 +75,9 @@ pipeline_hr = Pipeline([
                                        )),
 ])
 
-hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10),n_jobs=cores,
+hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10,random_state=123),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2')
+                    refit='r2',verbose=1)
 hr_clf.fit(classifier_embedding_reduced[hr_train!=0,:],hr_train[hr_train!=0])
 
 cv_results_hr=pd.DataFrame({'params':hr_clf.cv_results_['params'],
@@ -116,7 +116,7 @@ regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopp
 # regressor_resp_rate=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
-
+    ('variance_threshold',VarianceThreshold()),
     ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     ('select',SelectPercentile()),
     ('scl', StandardScaler()),
@@ -135,13 +135,13 @@ resp_rate_grid = {
     #                 'clf__transformer__n_quantiles':[200,300,500,700,900],
     # 'pca__n_components':[2,4,8,16,32],
     'poly__degree': [2, ],
-    'poly__interaction_only': [True, False],
-    'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
+    'poly__interaction_only': [ False,],
+    'select__percentile': [ 10, 15, 20, 30, 40, 60, ],
     'select__score_func': [mutual_info_regression, ]
 }
-resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10),n_jobs=cores,
+resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10,random_state=123),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2')
+                    refit='r2',verbose=1)
 resp_rate_clf.fit(classifier_embedding_reduced[~np.isnan(resp_rate_train),:],resp_rate_train[~np.isnan(resp_rate_train)])
 
 cv_results_resp_rate=pd.DataFrame({'params':resp_rate_clf.cv_results_['params'],
@@ -182,7 +182,7 @@ regressor_spo2=SGDRegressor(loss='squared_loss',max_iter=500000,early_stopping=T
 # regressor_spo2=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_spo2 = Pipeline([
-
+    ('variance_threshold',VarianceThreshold()),
     # ('pca',PCA()),
     ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
@@ -202,13 +202,13 @@ spo2_grid = {
              # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
              # 'pca__n_components':[2,4,8,16,32],
              'poly__degree': [2, ],
-             'poly__interaction_only': [True, False],
-             'select__percentile': [6, 10, 15, 20, 30, 40, 60, ],
+             'poly__interaction_only': [ False,],
+             'select__percentile': [ 10, 15, 20, 30, 40, 60, ],
              'select__score_func': [mutual_info_regression, ],
              }
-spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10),n_jobs=cores,
+spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10,random_state=123),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2',error_score=-1.0)
+                    refit='r2',error_score=-1.0,verbose=1)
 spo2_clf.fit(classifier_embedding_reduced[spo2_train>70,:],spo2_train[spo2_train>70])
 
 cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
