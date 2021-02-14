@@ -336,7 +336,7 @@ if __name__ == "__main__":
         # metric='loss',
         # mode='min',
         checkpoint_at_end=True,
-        resources_per_trial={"cpu": 2, "gpu": 0.2},
+        resources_per_trial={"cpu": 4, "gpu": 0.3},
         config=configs,
         local_dir=os.path.join(log_dir, "contrastive"),
         num_samples=500,
