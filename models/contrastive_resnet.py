@@ -55,7 +55,7 @@ enc_representation_size="32"
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
-experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}c"
+experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}d"
 
 
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
@@ -206,7 +206,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 
-def train_fun(model,optimizer,criterion,device,train_loader,val_loader):
+def train_fun(model,optimizer,criterion,device,train_loader,val_loader,scheduler):
     train_loss = 0
 
     model.train()
@@ -255,6 +255,7 @@ def train_fun(model,optimizer,criterion,device,train_loader,val_loader):
             # metrics = calculator.get_accuracy(xis.cpu().detach().numpy(), xjs.cpu().detach().numpy(),
             #                                   np.arange(xis.shape[0]), np.arange(xis.shape[0]),
             #                                   False)
+        scheduler.step(val_loss)
         xis_embeddings = np.concatenate(xis_embeddings)
         xjs_embeddings = np.concatenate(xjs_embeddings)
         accuracy = accuracy_fun(xis_embeddings, xjs_embeddings,distance=distance_fun)
@@ -265,6 +266,7 @@ class Trainer(tune.Trainable):
     def setup(self, config):
         self.model=get_model(config).to(device)
         self.optimizer=get_optimizer(config,self.model)
+        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min',patience=10,min_lr=5e-6)
         if enc_distance == "LpDistance":
             dist_fun=distances.DotProductSimilarity(normalize_embeddings=False)
         elif enc_distance =="DotProduct":
@@ -281,7 +283,7 @@ class Trainer(tune.Trainable):
 
     def step(self):
         train_loss,loss,accuracy=train_fun(self.model,self.optimizer,self.criterion,
-                            self.device,self.train_loader,self.val_loader)
+                            self.device,self.train_loader,self.val_loader,self.scheduler)
         return {'loss':loss,'accuracy':accuracy,'train_loss':train_loss}
 
     def save_checkpoint(self, checkpoint_dir):
@@ -301,11 +303,11 @@ configs = {
     'representation_size':tune.choice([32,]),
     'batch_size':tune.choice([8,16,32,64,128]),
     'enc_temp':tune.loguniform(0.0001,0.5),
-    'enc_lr':tune.loguniform(0.00001,1.0),
+    'enc_lr':tune.loguniform(0.0001,0.5),
     'enc_l2':tune.loguniform(0.00001,1.0),
     # 'enc_l1':tune.loguniform(0.000001,0.05),
     'aug_gaus':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
-    'aug_num_seg':tune.choice([2,5,10,20,40,80]),
+    'aug_num_seg':tune.choice([2,5,7,10]),
     'aug_prop_seg':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
 
 }
