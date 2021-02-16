@@ -26,7 +26,7 @@ from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifi
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
+from sklearn.model_selection import GridSearchCV,LeaveOneOut,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
 from settings import data_dir,weights_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -128,7 +128,7 @@ def make_loader(ds,**kwargs):
 
 
 base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=100, lr=0.01,
-                                   iterator_train=make_loader,
+                                   iterator_train=make_loader,train_split=None,
                                    optimizer=optim.SGD,verbose=False,device=device,
                                    callbacks=[InputShapeSetter,])
 
@@ -144,7 +144,7 @@ grid_parameters = {
     # 'iterator_train__sampler':[sampler,],
     'iterator_train__shuffle':[False,],
     # 'clf__batch_size':[32,64,128,256],
-    # 'clf__max_epochs':[300,500,750,1000,2000,5000],
+    'max_epochs':[10,30,50,100,300],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
@@ -165,7 +165,7 @@ grid_parameters = {
 # ('clf', base_clf),
 # ])
 
-clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(98 ,random_state=123),
+clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123),
                    verbose=1, n_jobs=jobs,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
