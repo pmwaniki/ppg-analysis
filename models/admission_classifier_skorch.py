@@ -165,13 +165,13 @@ grid_parameters = {
 # ('clf', base_clf),
 # ])
 
-clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
+clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(98 ,random_state=123),
                    verbose=1, n_jobs=jobs,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
 #
-clf.fit(classifier_embedding_reduced,admitted_train)
+clf.fit(train_x_scl,train_y)
 # clf.fit(classifier_embedding,train['admitted'])
 
 
@@ -182,10 +182,10 @@ cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_result
                          'f1':clf.cv_results_['mean_test_f1']})
 print(cv_results)
 
-test_pred=clf.predict_proba(test_embedding_reduced)[:,1]
+test_pred=clf.predict_proba(test_x_scl)[:,1]
 
-print(classification_report(admitted_test,test_pred>0.5))
-print("AUC: ",roc_auc_score(admitted_test,test_pred))
+print(classification_report(test_y,test_pred>0.5))
+print("AUC: ",roc_auc_score(test_y,test_pred))
 
 
 
