@@ -11,6 +11,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import TensorDataset,DataLoader,WeightedRandomSampler
 
 import skorch
 from skorch import NeuralNetBinaryClassifier
@@ -32,10 +33,10 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 
-# rng=np.random.RandomState(123)
+rng=np.random.RandomState(123)
 device="cuda" if torch.cuda.is_available() else "cpu"
 jobs= 6 if device=="cuda" else multiprocessing.cpu_count()-2
-experiment="Contrastive-sample-DotProduct32"
+experiment="Contrastive-sample-DotProduct32b"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -48,6 +49,48 @@ classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['
 test_embedding_reduced=np.stack(map(lambda id:test_embedding[test['id']==id,:].mean(axis=0) ,test_ids))
 admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[0],train_ids))
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
+
+#preprocessing
+preprocess_pipeline = Pipeline([
+    ('var_threshold', VarianceThreshold()),
+    ('poly', PolynomialFeatures(degree=2, include_bias=False, interaction_only=False)),
+    ('scl',StandardScaler())
+]
+)
+
+#Tensor datasets
+val_ids=rng.choice([True,False],size=classifier_embedding_reduced.shape[0],p=(0.2,0.8))
+train_x=classifier_embedding_reduced[~val_ids,:]
+train_y=admitted_train[~val_ids]
+val_x=classifier_embedding_reduced[val_ids,:]
+val_y=admitted_train[val_ids]
+test_x=test_embedding_reduced
+test_y=admitted_test
+
+train_x_scl=preprocess_pipeline.fit_transform(train_x)
+val_x_scl=preprocess_pipeline.transform(val_x)
+test_x_scl=preprocess_pipeline.transform(test_x)
+
+train_dataset=TensorDataset(torch.tensor(train_x_scl),torch.tensor(train_y))
+val_dataset=TensorDataset(torch.tensor(val_x_scl),torch.tensor(val_y))
+test_dataset=TensorDataset(torch.tensor(test_x_scl),torch.tensor(test_y))
+
+# sample weights
+# class_sample_count = np.array(
+#     [len(np.where(train_y == t)[0]) for t in np.unique(train_y)])
+# weight = 1. / class_sample_count
+# samples_weight = np.array([weight[int(t)] for t in train_y])
+#
+# samples_weight = torch.from_numpy(samples_weight)
+# samples_weight = samples_weight.double()
+# sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+
+# train_loader=DataLoader(train_dataset,batch_size=32,shuffle=False,sampler=sampler,num_workers=5)
+# val_loader=DataLoader(val_dataset,batch_size=32,shuffle=False,num_workers=5)
+# test_loader=DataLoader(test_dataset,batch_size=32,shuffle=False,num_workers=5)
+
+
+
 
 
 class Net(nn.Module):
@@ -65,41 +108,43 @@ class InputShapeSetter(skorch.callbacks.Callback):
 
 early_stoping=skorch.callbacks.EarlyStopping(patience=10)
 
-base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=10000, lr=0.01, batch_size=64,
+def make_loader(ds,**kwargs):
+    y=[]
+    for i in range(len(ds)):
+        _,y_=ds.__getitem__(i)
+        y.append(y_)
+    y=torch.as_tensor(y).numpy()
+    class_sample_count = np.array(
+        [len(np.where(y == t)[0]) for t in np.unique(y)])
+    weight = 1. / class_sample_count
+    samples_weight = np.array([weight[int(t)] for t in y])
+
+    samples_weight = torch.from_numpy(samples_weight)
+    samples_weight = samples_weight.double()
+    sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+    loader=DataLoader(ds,sampler=sampler,**kwargs)
+    return loader
+
+
+
+base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=100, lr=0.01,
+                                   iterator_train=make_loader,
                                    optimizer=optim.SGD,verbose=False,device=device,
-                                   train_split=None,
                                    callbacks=[InputShapeSetter,])
 
-# base_clf=SGDClassifier(loss='modified_huber',
-#                        class_weight='balanced',
-#                        penalty='l2',
-#                        early_stopping=True,n_iter_no_change=20,max_iter=500000,random_state=123)
-# base_clf=LogisticRegression(
-#     # penalty='elasticnet',
-#     max_iter=500000,
-#     random_state=56,
-#     # solver='saga',
-#     class_weight='balanced')
-# base_clf=SVC(probability=True,class_weight="balanced")
 
 
-# tuned_parameters = {
-#     # 'clf__alpha': (1e-5, 1e-1, 'loguniform'),
-#     'clf__alpha': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__eta0': scipy.stats.loguniform(1e-5, 1e-1),
-#     'clf__learning_rate': [ 'adaptive',],
-#     'clf__class_weight':['balanced'],#'[{0:1,1:2},{0:1,1:3},{0:1,1:5},{0:1,1:10},{0:1,1:100}]
-#     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
-#
-# }
+
 
 grid_parameters = {
-    'clf__lr':[0.01,0.001,0.0001,0.00001],
-    'clf__criterion__pos_weight':[torch.tensor(3.0)],
-    'clf__optimizer__weight_decay':[1e-6,0.00001,0.0001,0.001,0.01,0.1],
-    'clf__optimizer__momentum':[0.9,0.99],
+    'lr':[0.01,0.001,0.0001,0.00001],
+    # 'criterion__pos_weight':[torch.tensor(3.0)],
+    'optimizer__weight_decay':[1e-6,0.00001,0.0001,0.001,0.01,0.1],
+    'optimizer__momentum':[0.9,0.99],
+    # 'iterator_train__sampler':[sampler,],
+    'iterator_train__shuffle':[False,],
     # 'clf__batch_size':[32,64,128,256],
-    'clf__max_epochs':[300,500,750,1000,2000,5000],
+    # 'clf__max_epochs':[300,500,750,1000,2000,5000],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
@@ -110,17 +155,17 @@ grid_parameters = {
     # 'select__score_func': [mutual_info_classif, ],
 
 }
+#
+# pipeline = Pipeline([
+#     # ('variance_threshold',VarianceThreshold()),
+#     # ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
+#     # ('select', SelectPercentile(mutual_info_classif)),
+#     ('scl', StandardScaler()),
+#     # ('clf', RFECV(estimator=base_clf)),
+# ('clf', base_clf),
+# ])
 
-pipeline = Pipeline([
-    # ('variance_threshold',VarianceThreshold()),
-    ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
-    # ('select', SelectPercentile(mutual_info_classif)),
-    ('scl', StandardScaler()),
-    # ('clf', RFECV(estimator=base_clf)),
-('clf', base_clf),
-])
-
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
+clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123),
                    verbose=1, n_jobs=jobs,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
