@@ -51,7 +51,7 @@ display=os.environ.get('DISPLAY',None) is not None
 enc_representation_size="32"
 # enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 # distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
-experiment=f"Supervised-{enc_representation_size}b"
+experiment=f"Supervised-{enc_representation_size}c"
 # enc_output_size=64
 # enc_batch_size=64
 # enc_temp = 0.05
