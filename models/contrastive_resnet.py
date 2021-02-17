@@ -55,7 +55,7 @@ enc_representation_size="32"
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
-experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}e"
+experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}f"
 
 
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")

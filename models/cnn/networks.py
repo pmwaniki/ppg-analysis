@@ -353,7 +353,7 @@ def resnet50(num_classes=1,norm_layer=None,**kwargs):
 
 
 def resnet1d(num_classes=1,norm_layer=None,**kwargs):
-    # kwargs['width_per_group'] = 64 * 2
+    kwargs['width_per_group'] = 64 * 2
     model=Resnet1D(block=Bottleneck_1d,
                    layers=[3, 4, 6, 3],
                    # layers=[3,8,24,3],
