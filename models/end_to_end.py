@@ -258,7 +258,7 @@ class Trainer(tune.Trainable):
         self.optimizer=get_optimizer(config,self.model)
 
         self.criterion=nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config['pos_weight'])).to(device)
-        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,patience=10,min_lr=1e-6)
+        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,factor=0.5,patience=50,min_lr=1e-6)
         self.train_loader,self.val_loader=get_loader(config)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
