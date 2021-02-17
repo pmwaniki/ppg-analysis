@@ -55,7 +55,7 @@ enc_representation_size="32"
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
-experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}d"
+experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}e"
 
 
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
@@ -266,7 +266,7 @@ class Trainer(tune.Trainable):
     def setup(self, config):
         self.model=get_model(config).to(device)
         self.optimizer=get_optimizer(config,self.model)
-        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,mode='min',patience=10,min_lr=5e-6)
+        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,factor=0.5,mode='min',patience=200)
         if enc_distance == "LpDistance":
             dist_fun=distances.DotProductSimilarity(normalize_embeddings=False)
         elif enc_distance =="DotProduct":
