@@ -352,7 +352,17 @@ def resnet50(num_classes=1,norm_layer=None,**kwargs):
     return model
 
 
-def resnet1d(num_classes=1,norm_layer=None,**kwargs):
+def resnet50_1d(num_classes=1,norm_layer=None,**kwargs):
+    # kwargs['width_per_group'] = 64 * 2
+    model=Resnet1D(block=Bottleneck_1d,
+                   layers=[3, 4, 6, 3],
+                   # layers=[3,8,24,3],
+                   num_classes=num_classes,
+                   norm_layer=norm_layer,
+                   **kwargs)
+    return model
+
+def wideresnet50_1d(num_classes=1,norm_layer=None,**kwargs):
     kwargs['width_per_group'] = 64 * 2
     model=Resnet1D(block=Bottleneck_1d,
                    layers=[3, 4, 6, 3],
@@ -449,13 +459,13 @@ class MLP(nn.Module):
 
 
 
-@torch.no_grad()
-def concat_all_gather(tensor):
-    tensors_gather=[torch.ones_like(tensor)
-                   for _ in range(torch.distributed.get_world_size())]
-    torch.distributed.all_gather(tensors_gather,tensor,async_op=False)
-    output=torch.cat(tensors_gather,dim=0)
-    return output
+# @torch.no_grad()
+# def concat_all_gather(tensor):
+#     tensors_gather=[torch.ones_like(tensor)
+#                    for _ in range(torch.distributed.get_world_size())]
+#     torch.distributed.all_gather(tensors_gather,tensor,async_op=False)
+#     output=torch.cat(tensors_gather,dim=0)
+#     return output
 
 
 
@@ -463,13 +473,13 @@ def concat_all_gather(tensor):
 
 if __name__=="__main__":
     from torchsummary import summary
-    # model=resnet18().cuda()
-    # summary(model,(2,11,37))
-    # resnet_model=resnet50().cuda()
-    # summary(resnet_model,(2,224,224))
+    model=resnet1d().cuda()
+    summary(model,(2,800))
+    model2=wideresnet1d().cuda()
+    summary(model2,(2,800))
     # model1d=resnet1d().cuda()
     # summary(model1d,(2,800))
-    raw_model=resnet1d()
-    stft_model=resnet18()
-    full_model=Encoder(raw_model=raw_model,stft_model=stft_model,representation_size=128).cuda()
-    summary(full_model,[(2,800),(2,11,35)])
+    # raw_model=resnet1d()
+    # stft_model=resnet18()
+    # full_model=Encoder(raw_model=raw_model,stft_model=stft_model,representation_size=128).cuda()
+    # summary(full_model,[(2,800),(2,11,35)])
