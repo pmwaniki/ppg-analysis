@@ -10,6 +10,7 @@ from settings import data_dir,segment_length,segment_slide
 from datasets.signals import resample
 from settings import Fs
 import joblib
+from bson.objectid import ObjectId
 
 fs=Fs
 sig_lenght=segment_length
@@ -119,6 +120,7 @@ if __name__ == "__main__":
     low_sqi_segments=0
     segment_data=[]
     signal_lengths=[]
+    mongo_id=1
     for id in ids:
         trend_data = pd.read_csv(trend_filnames[id], skiprows=1)
         red_sig = read_float(red_filenames[id])
@@ -149,7 +151,8 @@ if __name__ == "__main__":
                 low_sqi_segments+=1
                 j += (slide * fs)
                 continue
-            seg={'id': id,
+            seg={
+                 'id': id,
              #'seg_id':str(insertion.inserted_id),
             'admitted': (data.loc[data['Study No'] == id, "Was child admitted (this illness)?"].values[0]=="Yes")*1.0,
             'died':(data2.loc[data2['Study No'] == id, "died"].values[0]=="Died"),
@@ -160,6 +163,7 @@ if __name__ == "__main__":
              'spo2':trend_seg[' Saturation'].median(),
              'perfusion':trend_seg[' Perfusion'].median()}
             insertion = segments.insert_one({
+                '_id':ObjectId(f"{mongo_id:024x}"),
                 'id': id,
                 'red': list(red_sig2[j:j + samples]),
                 'infrared': list(infrared_sig2[j:j + samples]),
@@ -170,6 +174,7 @@ if __name__ == "__main__":
             segment_data.append(seg)
             j += (slide * fs)
             pos += 1
+            mongo_id+=1
 
     segment_data2=pd.DataFrame(segment_data)
     segment_data2.to_csv(os.path.join(data_dir,"triage/segments.csv"),index=False)
