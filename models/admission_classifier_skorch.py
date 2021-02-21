@@ -36,7 +36,7 @@ from utils import save_table3
 rng=np.random.RandomState(123)
 device="cuda" if torch.cuda.is_available() else "cpu"
 jobs= 6 if device=="cuda" else multiprocessing.cpu_count()-2
-experiment="Contrastive-sample-DotProduct32b"
+experiment="Contrastive-wide-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -60,8 +60,8 @@ preprocess_pipeline = Pipeline([
 
 #Tensor datasets
 val_ids=rng.choice([True,False],size=classifier_embedding_reduced.shape[0],p=(0.2,0.8))
-train_x=classifier_embedding_reduced[~val_ids,:]
-train_y=admitted_train[~val_ids]
+train_x=classifier_embedding_reduced#[~val_ids,:]
+train_y=admitted_train#[~val_ids]
 val_x=classifier_embedding_reduced[val_ids,:]
 val_y=admitted_train[val_ids]
 test_x=test_embedding_reduced
@@ -75,19 +75,7 @@ train_dataset=TensorDataset(torch.tensor(train_x_scl),torch.tensor(train_y))
 val_dataset=TensorDataset(torch.tensor(val_x_scl),torch.tensor(val_y))
 test_dataset=TensorDataset(torch.tensor(test_x_scl),torch.tensor(test_y))
 
-# sample weights
-# class_sample_count = np.array(
-#     [len(np.where(train_y == t)[0]) for t in np.unique(train_y)])
-# weight = 1. / class_sample_count
-# samples_weight = np.array([weight[int(t)] for t in train_y])
-#
-# samples_weight = torch.from_numpy(samples_weight)
-# samples_weight = samples_weight.double()
-# sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
-# train_loader=DataLoader(train_dataset,batch_size=32,shuffle=False,sampler=sampler,num_workers=5)
-# val_loader=DataLoader(val_dataset,batch_size=32,shuffle=False,num_workers=5)
-# test_loader=DataLoader(test_dataset,batch_size=32,shuffle=False,num_workers=5)
 
 
 
@@ -98,6 +86,7 @@ class Net(nn.Module):
         super().__init__()
         self.linear=nn.Linear(dim_x,1)
         torch.nn.init.xavier_normal_(self.linear.weight)
+        torch.nn.init.constant_(self.linear.bias,0.0)
 
     def forward(self,x):
         return self.linear(x)
@@ -139,17 +128,17 @@ base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=100, lr=0.01,
 grid_parameters = {
     'lr':[0.01,0.001,0.0001,0.00001],
     # 'criterion__pos_weight':[torch.tensor(3.0)],
-    'optimizer__weight_decay':[1e-6,0.00001,0.0001,0.001,0.01,0.1],
+    'optimizer__weight_decay':[0.00001,0.0001,0.001,0.01,0.1,1.0,10.0,100.0],
     'optimizer__momentum':[0.9,0.99],
     # 'iterator_train__sampler':[sampler,],
-    'iterator_train__shuffle':[False,],
-    # 'clf__batch_size':[32,64,128,256],
+#     'iterator_train__shuffle':[False,],
+    'batch_size':[32,64,128,256],
     'max_epochs':[10,30,50,100,300],
     # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
 
-    # 'poly__degree': [1,2, ],
+    # 'poly__degree': [2, ],
     # 'poly__interaction_only': [True, False],
     # 'select__percentile': [ 10, 15, 20, 30, 40, 60, 70,100],
     # 'select__score_func': [mutual_info_classif, ],
@@ -172,6 +161,8 @@ clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(50 ,
                    )
 #
 clf.fit(train_x_scl,train_y)
+clf.best_score_
+clf.best_estimator_.get_params()
 # clf.fit(classifier_embedding,train['admitted'])
 
 
