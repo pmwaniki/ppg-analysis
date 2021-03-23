@@ -27,7 +27,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-sample-DotProduct32b"
+experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
@@ -61,7 +61,7 @@ hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
                 'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
          'poly__degree':[2,],
          'poly__interaction_only':[False],
-         'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,],
+         'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,100],
          'select__score_func':[mutual_info_regression,]
         }
 pipeline_hr = Pipeline([

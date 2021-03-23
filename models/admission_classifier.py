@@ -26,7 +26,7 @@ from utils import save_table3
 
 # rng=np.random.RandomState(123)
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-sample-DotProduct32b"
+experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -41,36 +41,36 @@ admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 
 
-base_clf=SGDClassifier(loss='modified_huber',
-                       class_weight='balanced',
-                       penalty='l2',
-                       early_stopping=False,
-#                        validation_fraction=0.05,n_iter_no_change=20,
-                       max_iter=100,random_state=123)
+# base_clf=SGDClassifier(loss='modified_huber',
+#                        class_weight='balanced',
+#                        penalty='l2',
+#                        early_stopping=False,
+# #                        validation_fraction=0.05,n_iter_no_change=20,
+#                        max_iter=100,random_state=123)
                        # n_iter_no_change=20,
-# base_clf=LogisticRegression(
-#     # penalty='elasticnet',
-#     max_iter=500000,
-#     random_state=56,
-#     # solver='saga',
-#     class_weight='balanced')
+base_clf=LogisticRegression(
+    # penalty='elasticnet',
+    max_iter=500000,
+    random_state=56,
+    # solver='saga',
+    class_weight='balanced')
 
 
 
 
 grid_parameters = {
-    # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
+    'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
     # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 
 
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
-    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+#     'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
+#     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
 #     'clf__max_iter':[5,10,50,100,200,500],
 #     'clf__loss': ['modified_huber'],
 #     'clf__learning_rate': [ 'adaptive',],
-    'poly__degree': [2, ],
+#     'poly__degree': [2, ],
 
-    'poly__interaction_only': [False,],
+#     'poly__interaction_only': [False,],
     'select__percentile': [10, 15, 20, 30, 40, 60, 70,100],
 #     'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
@@ -79,7 +79,7 @@ grid_parameters = {
 
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
-    ('poly', PolynomialFeatures(degree=2,interaction_only=True,include_bias=False)),
+    ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
     ('scl', StandardScaler()),
     ('clf', base_clf),
