@@ -164,7 +164,7 @@ class Resnet1D(nn.Module):
         self.groups=groups
         self.base_width=width_per_group
 
-        self.bn0=nn.BatchNorm1d(2)
+        # self.bn0=nn.BatchNorm1d(2)
         self.conv1=nn.Conv1d(2,self.in_planes,kernel_size=7,dilation=2,padding=3,stride=1,bias=False)
         self.bn1=norm_layer(self.in_planes)
         self.relu=nn.ReLU(inplace=True)
@@ -215,7 +215,7 @@ class Resnet1D(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self,x):
-        x=self.bn0(x)
+        # x=self.bn0(x)
         x=self.conv1(x)
         x=self.bn1(x)
         x=self.relu(x)
