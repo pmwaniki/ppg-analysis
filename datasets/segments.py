@@ -1,15 +1,16 @@
-from datasets.mongo import triage,get_by_id
+# from datasets.mongo import triage,get_by_id
 import numpy as np
 import struct
 import glob
 import re
-import os
+import os,shutil
 import scipy.io as io
 import pandas as pd
 from settings import data_dir,segment_length,segment_slide
 from datasets.signals import resample
 from settings import Fs
 import joblib
+from bson.objectid import ObjectId
 
 fs=Fs
 sig_lenght=segment_length
@@ -18,10 +19,10 @@ slide=segment_slide
 sqi_min=50
 
 
-if "segments" in triage.list_collection_names():
-    triage.drop_collection("segments")
-
-segments=triage.segments
+# if "segments" in triage.list_collection_names():
+#     triage.drop_collection("segments")
+#
+# segments=triage.segments
 
 
 
@@ -113,12 +114,15 @@ np.random.seed(125)
 train_ids = np.random.choice(ids,size=int(len(ids)*0.8),replace=False)
 test_ids=np.setdiff1d(ids,train_ids)
 
+shutil.rmtree(os.path.join(data_dir,"segments"),ignore_errors=True)
+os.makedirs(os.path.join(data_dir,"segments"),exist_ok=True)
 
 if __name__ == "__main__":
-    segments.delete_many({})
+    # segments.delete_many({})
     low_sqi_segments=0
     segment_data=[]
     signal_lengths=[]
+    # mongo_id=1
     for id in ids:
         trend_data = pd.read_csv(trend_filnames[id], skiprows=1)
         red_sig = read_float(red_filenames[id])
@@ -149,7 +153,8 @@ if __name__ == "__main__":
                 low_sqi_segments+=1
                 j += (slide * fs)
                 continue
-            seg={'id': id,
+            seg={
+                 'id': id,
              #'seg_id':str(insertion.inserted_id),
             'admitted': (data.loc[data['Study No'] == id, "Was child admitted (this illness)?"].values[0]=="Yes")*1.0,
             'died':(data2.loc[data2['Study No'] == id, "died"].values[0]=="Died"),
@@ -159,17 +164,24 @@ if __name__ == "__main__":
             'hb':data2.loc[data2['Study No']==id,"hb1_result"].values[0],
              'spo2':trend_seg[' Saturation'].median(),
              'perfusion':trend_seg[' Perfusion'].median()}
-            insertion = segments.insert_one({
-                'id': id,
-                'red': list(red_sig2[j:j + samples]),
-                'infrared': list(infrared_sig2[j:j + samples]),
 
-            })
-            seg['seg_id']=str(insertion.inserted_id)
+            joblib.dump({'id': id,
+                'red': list(red_sig2[j:j + samples]),
+                'infrared': list(infrared_sig2[j:j + samples]),},
+                        filename=os.path.join(data_dir,f"segments/triage-{id}-{pos}.joblib"))
+            # insertion = segments.insert_one({
+            #     '_id':ObjectId(f"{mongo_id:024x}"),
+            #     'id': id,
+            #     'red': list(red_sig2[j:j + samples]),
+            #     'infrared': list(infrared_sig2[j:j + samples]),
+            #
+            # })
+            seg['filename']=os.path.join(data_dir,f"segments/triage-{id}-{pos}.joblib")
             seg['position']=pos
             segment_data.append(seg)
             j += (slide * fs)
             pos += 1
+            # mongo_id+=1
 
     segment_data2=pd.DataFrame(segment_data)
     segment_data2.to_csv(os.path.join(data_dir,"triage/segments.csv"),index=False)
@@ -179,8 +191,8 @@ if __name__ == "__main__":
     np.random.seed(123)
     sample_data=segment_data2.loc[np.random.choice(range(len(segment_data2)),size=sample_size,replace=False),:].reindex()
     sample_data2={name:np.array(values) for name,values in sample_data.iteritems()}
-    sample_data2['red']=np.array([get_by_id(s, segments)['red'] for s in sample_data2['seg_id']])
-    sample_data2['infrared'] = np.array([get_by_id(s, segments)['infrared'] for s in sample_data2['seg_id']])
+    sample_data2['red']=np.array([joblib.load(s)['red'] for s in sample_data2['filename']])
+    sample_data2['infrared'] = np.array([joblib.load(s)['infrared'] for s in sample_data2['filename']])
     sample_data2['Fs']=fs
     io.savemat('triage.mat', sample_data2)
 

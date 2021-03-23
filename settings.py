@@ -17,11 +17,11 @@ except:
 if os.uname()[1]=='kenbo-cen07':
     data_dir="/home/local/KWTRP/pmwaniki/data/ppg"
 weights_dir=os.path.join(data_dir,"results/weights")
-checkpoint_dir=os.path.join(data_dir,"checkpoints")
-if os.uname()[1]=="kenbo-pc0177-d":
-    checkpoint_dir="/home/pmwaniki/checkpoints/contrastive"
-elif os.uname()[1]=="kenbo-pc0139":
-    checkpoint_dir="/home/pmwaniki/checkpoints/contrastive"
+checkpoint_dir="/home/pmwaniki/data/logs/ppg/"
+# if os.uname()[1]=="kenbo-pc0177-d":
+#     checkpoint_dir="/home/pmwaniki/checkpoints/contrastive"
+# elif os.uname()[1]=="kenbo-pc0139":
+#     checkpoint_dir="/home/pmwaniki/checkpoints/contrastive"
 
 class Mongo(Enum):
     host='127.0.0.1'
