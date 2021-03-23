@@ -411,9 +411,8 @@ class EncoderRaw(nn.Module):
         self.dropout=dropout
 
 
-        # num_features=raw_model.num_classes+stft_model.num_classes
         num_features=base_model.out_features
-        self.bn0 = nn.BatchNorm1d(num_features)
+        # self.bn0 = nn.BatchNorm1d(num_features)
         self.fc0=nn.Linear(num_features,representation_size)
         # self.bn1=nn.BatchNorm1d(256)
         # self.dropout=nn.Dropout(p=dropout)
@@ -427,7 +426,7 @@ class EncoderRaw(nn.Module):
 
     def forward(self,x):
         x=self.base_model(x)
-        x=self.bn0(x)
+        # x=self.bn0(x)
         x=self.relu(x)
         x=F.dropout(x,p=self.dropout)
         x=self.fc0(x)
@@ -473,9 +472,9 @@ class MLP(nn.Module):
 
 if __name__=="__main__":
     from torchsummary import summary
-    model=resnet1d().cuda()
+    model=resnet50_1d().cuda()
     summary(model,(2,800))
-    model2=wideresnet1d().cuda()
+    model2=wideresnet50_1d().cuda()
     summary(model2,(2,800))
     # model1d=resnet1d().cuda()
     # summary(model1d,(2,800))

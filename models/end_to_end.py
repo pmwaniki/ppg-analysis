@@ -11,7 +11,7 @@ from settings import checkpoint_dir as log_dir
 import os
 import json
 from models.networks import init_fun
-from models.cnn.networks import resnet1d,EncoderRaw,MLP
+from models.cnn.networks import resnet50_1d,EncoderRaw,wideresnet50_1d
 from models.cnn.wavenet2 import WaveNetModel
 from datasets.signals import stft,gaus_noise,rand_sfft,permute
 from sklearn.model_selection import train_test_split
@@ -31,11 +31,11 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from tqdm import tqdm
 from settings import Fs,weights_dir
-from pytorch_metric_learning import distances,regularizers,losses,testers
-from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
+
 
 import ray
-ray.init( num_cpus=12,dashboard_host="0.0.0.0")
+ray.init(address="auto")
+# ray.init( num_cpus=12,dashboard_host="0.0.0.0")
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler,HyperBandScheduler,AsyncHyperBandScheduler
@@ -49,9 +49,10 @@ display=os.environ.get('DISPLAY',None) is not None
 
 
 enc_representation_size="32"
+res_type="original" # wide,original
 # enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 # distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
-experiment=f"Supervised-{enc_representation_size}c"
+experiment=f"Supervised-{res_type}-{enc_representation_size}"
 # enc_output_size=64
 # enc_batch_size=64
 # enc_temp = 0.05
@@ -193,7 +194,10 @@ def get_loader(config):
     return train_loader,val_loader
 
 def get_model(config):
-    base_model = resnet1d(num_classes=512)
+    if res_type=="original":
+        base_model = resnet50_1d(num_classes=32)
+    elif res_type=="wide":
+        base_model=wideresnet50_1d(num_classes=32)
 
     model = EncoderRaw(base_model, representation_size=config['representation_size'],
                        dropout=config['dropout'], num_classes=1)
@@ -316,15 +320,15 @@ if __name__=="__main__":
         # metric='loss',
         # mode='min',
         checkpoint_at_end=True,
-        resources_per_trial={"cpu": 2, "gpu": 0.15},
+        resources_per_trial={"cpu": 3, "gpu": 0.3},
         config=configs,
         local_dir=os.path.join(log_dir, "Supervised"),
-        num_samples=500,
+        num_samples=200,
         name=experiment,
         resume=False,
         scheduler=scheduler,
         progress_reporter=reporter,
-        reuse_actors=True,
+        reuse_actors=False,
         raise_on_failed_trial=False)
     df = result.results_df
     # df.to_csv(os.path.join(data_dir, "results/hypersearch.csv"), index=False)

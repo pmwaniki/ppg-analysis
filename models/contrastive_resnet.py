@@ -3,15 +3,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader,WeightedRandomSampler,random_split
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau,StepLR
 from torchsummary import summary
-# import torchaudio
 from settings import data_dir
 from settings import checkpoint_dir as log_dir
 import os
-import json
 from models.networks import init_fun
-from models.cnn.networks import resnet1d,EncoderRaw,MLP
+from models.cnn.networks import resnet50_1d,EncoderRaw,wideresnet50_1d
 from models.cnn.wavenet2 import WaveNetModel
 from datasets.signals import stft,gaus_noise,rand_sfft,permute
 from sklearn.model_selection import train_test_split
@@ -20,9 +18,6 @@ from functools import partial
 from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV,StratifiedKFold,RepeatedStratifiedKFold
 from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.spatial.distance import cosine
 import itertools
@@ -30,19 +25,19 @@ from datasets.loaders import TriageDataset,TriagePairs
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from tqdm import tqdm
-from settings import Fs,weights_dir
+from settings import weights_dir
 from pytorch_metric_learning import distances,regularizers,losses,testers
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 
 import ray
-ray.init( num_cpus=12,dashboard_host="0.0.0.0")
+# ray.init( num_cpus=12,dashboard_host="0.0.0.0")
+ray.init(address="auto")
 from ray import tune
 from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler,HyperBandScheduler,AsyncHyperBandScheduler
+from ray.tune.schedulers import ASHAScheduler,PopulationBasedTraining,HyperBandScheduler,AsyncHyperBandScheduler
 
 import joblib
-import copy
-from utils import save_table3
+
 
 display=os.environ.get('DISPLAY',None) is not None
 
@@ -52,10 +47,11 @@ display=os.environ.get('DISPLAY',None) is not None
 # enc_l1_=0.001
 # dropout_=0.05
 enc_representation_size="32"
+res_type="original" # wide,original
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
-experiment=f"Contrastive-{pretext}-{enc_distance}{enc_representation_size}f"
+experiment=f"Contrastive-{res_type}-{pretext}-{enc_distance}{enc_representation_size}"
 
 
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
@@ -186,7 +182,10 @@ def get_loader(config):
     return train_loader,val_loader
 
 def get_model(config):
-    base_model = resnet1d(num_classes=512)
+    if res_type == "original":
+        base_model = resnet50_1d(num_classes=32)
+    elif res_type == "wide":
+        base_model = wideresnet50_1d(num_classes=32)
 
     model = EncoderRaw(base_model, representation_size=config['representation_size'],
                        dropout=config['dropout'], num_classes=config['enc_output_size'])
@@ -195,9 +194,14 @@ def get_model(config):
     return model
 
 def get_optimizer(config,model):
-    optimizer = torch.optim.Adam(params=model.parameters(),
-                                 lr=config['enc_lr'],
-                                 weight_decay=config['enc_l2'])
+    optimizer=torch.optim.Adam(params=[
+        {'params':model.base_model.parameters()},
+        {'params':model.fc0.parameters(),'lr':config['lr_fc'],'weight_decay':config['l2_fc']},
+        {'params':model.fc.parameters(),'lr':config['lr_fc'],'weight_decay':config['l2_fc']}
+    ],lr=config['lr'],weight_decay=config['l2'])
+    # optimizer = torch.optim.Adam(params=model.parameters(),
+    #                              lr=config['enc_lr'],
+    #                              weight_decay=config['enc_l2'])
     return optimizer
 
 
@@ -206,7 +210,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 
-def train_fun(model,optimizer,criterion,device,train_loader,val_loader,scheduler):
+def train_fun(model,optimizer,criterion,device,train_loader,val_loader,scheduler=None):
     train_loss = 0
 
     model.train()
@@ -255,7 +259,7 @@ def train_fun(model,optimizer,criterion,device,train_loader,val_loader,scheduler
             # metrics = calculator.get_accuracy(xis.cpu().detach().numpy(), xjs.cpu().detach().numpy(),
             #                                   np.arange(xis.shape[0]), np.arange(xis.shape[0]),
             #                                   False)
-        scheduler.step(val_loss)
+        if scheduler is not None: scheduler.step()
         xis_embeddings = np.concatenate(xis_embeddings)
         xjs_embeddings = np.concatenate(xjs_embeddings)
         accuracy = accuracy_fun(xis_embeddings, xjs_embeddings,distance=distance_fun)
@@ -266,7 +270,7 @@ class Trainer(tune.Trainable):
     def setup(self, config):
         self.model=get_model(config).to(device)
         self.optimizer=get_optimizer(config,self.model)
-        self.scheduler=torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,factor=0.5,mode='min',patience=200)
+        self.scheduler=StepLR(self.optimizer,step_size=200,gamma=.5)
         if enc_distance == "LpDistance":
             dist_fun=distances.DotProductSimilarity(normalize_embeddings=False)
         elif enc_distance =="DotProduct":
@@ -275,6 +279,7 @@ class Trainer(tune.Trainable):
             dist_fun=distances.CosineSimilarity()
         else:
             raise NotImplementedError(f"{enc_distance} not implemented yet!!!")
+        self.dist_fun=dist_fun
         self.criterion=losses.NTXentLoss(temperature=config['enc_temp'],
                                   distance=dist_fun,
                                   ).to(device)
@@ -297,14 +302,17 @@ class Trainer(tune.Trainable):
         self.optimizer.load_state_dict(optimizer_state)
 
 
+
 configs = {
     'dropout':tune.loguniform(0.01,0.5),
     'enc_output_size':tune.choice([32,]),
     'representation_size':tune.choice([32,]),
-    'batch_size':tune.choice([8,16,32,64,128]),
+    'batch_size':tune.choice([8,16,32,64,]),
     'enc_temp':tune.loguniform(0.0001,0.5),
-    'enc_lr':tune.loguniform(0.0001,0.5),
-    'enc_l2':tune.loguniform(0.00001,1.0),
+    'lr':tune.loguniform(0.00001,0.5),
+    'l2':tune.loguniform(0.000001,1.0),
+    'lr_fc':tune.loguniform(0.00001,0.5),
+    'l2_fc':tune.loguniform(0.000001,1.0),
     # 'enc_l1':tune.loguniform(0.000001,0.05),
     'aug_gaus':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
     'aug_num_seg':tune.choice([2,5,8,10]),
@@ -318,8 +326,20 @@ scheduler = ASHAScheduler(
         metric="loss",
         mode="min",
         max_t=700,
-        grace_period=10,
+        grace_period=20,
         reduction_factor=2)
+
+# scheduler = PopulationBasedTraining(
+#         time_attr="training_iteration",
+#         metric="loss",
+#         mode="min",
+#         perturbation_interval=10,
+#         hyperparam_mutations={
+#             # distribution for resampling
+#             "enc_lr": lambda: np.random.uniform(1e-1, 1e-5),
+#             "enc_l2": lambda: np.random.uniform(1e-1, 1e-5),
+#         })
+
 # scheduler=AsyncHyperBandScheduler(
 #         time_attr="training_iteration",
 #         metric="loss",
@@ -328,83 +348,83 @@ scheduler = ASHAScheduler(
 #         max_t=700)
 # scheduler = HyperBandScheduler(metric="loss", mode="min")
 
-if __name__ == "__main__":
-
-    reporter = CLIReporter(
-        # parameter_columns=["l1", "l2", "lr", "batch_size"],
-        metric_columns=["loss", "accuracy", "training_iteration"])
-    result = tune.run(
-        Trainer,
-        # metric='loss',
-        # mode='min',
-        checkpoint_at_end=True,
-        resources_per_trial={"cpu": 4, "gpu": 0.3},
-        config=configs,
-        local_dir=os.path.join(log_dir, "contrastive"),
-        num_samples=500,
-        name=experiment,
-        # resume=True,
-        scheduler=scheduler,
-        progress_reporter=reporter,
-        reuse_actors=True,
-        raise_on_failed_trial=False)
-
-    df = result.results_df
-    df.to_csv(os.path.join(data_dir, f"results/hypersearch-{experiment}.csv"), index=False)
-    best_trial = result.get_best_trial("loss", "min", "last")
-    best_config=result.get_best_config('loss','min')
-
-    best_model=get_model(best_config)
-    best_trial=result.get_best_trial('loss','min')
-    best_checkpoint=result.get_best_checkpoint(best_trial,'loss','min')
-    model_state,optimizer_state=torch.load(best_checkpoint)
 
 
-    best_model.load_state_dict(model_state)
-    best_model.to(device)
-    # Test model accuracy
+reporter = CLIReporter(
+    # parameter_columns=["l1", "l2", "lr", "batch_size"],
+    metric_columns=["loss", "accuracy", "training_iteration"])
+result = tune.run(
+    Trainer,
+    # metric='loss',
+    # mode='min',
+    checkpoint_at_end=True,
+    resources_per_trial={"cpu": 2, "gpu": 0.15},
+    config=configs,
+    local_dir=log_dir,
+    num_samples=500,
+    name=experiment,
+    # resume=True,
+    scheduler=scheduler,
+    progress_reporter=reporter,
+    reuse_actors=False,
+    raise_on_failed_trial=False)
+
+df = result.results_df
+df.to_csv(os.path.join(data_dir, f"results/hypersearch-{experiment}.csv"), index=False)
+best_trial = result.get_best_trial("loss", "min", "last")
+best_config=result.get_best_config('loss','min')
+
+best_model=get_model(best_config)
+# best_trial=result.get_best_trial('loss','min')
+best_checkpoint=result.get_best_checkpoint(best_trial,'loss','min')
+model_state,optimizer_state=torch.load(best_checkpoint)
+
+
+best_model.load_state_dict(model_state)
+best_model.to(device)
+# Test model accuracy
+best_model.eval()
+xis_embeddings = []
+xjs_embeddings = []
+with torch.no_grad():
+    for x1_raw, x2_raw in encoder_test_loader:
+        x1_raw = x1_raw.to(device, dtype=torch.float)
+        xis = best_model(x1_raw)
+        x2_raw = x2_raw.to(device, dtype=torch.float)
+        xjs = best_model(x2_raw)
+        xis = nn.functional.normalize(xis, dim=1)
+        xjs = nn.functional.normalize(xjs, dim=1)
+        xis_embeddings.append(xis.cpu().detach().numpy())
+        xjs_embeddings.append(xjs.cpu().detach().numpy())
+    xis_embeddings = np.concatenate(xis_embeddings)
+    xjs_embeddings = np.concatenate(xjs_embeddings)
+    accuracy = accuracy_fun(xis_embeddings, xjs_embeddings,distance=distance_fun)
+    print(f"Accuracy: {accuracy}")
+
+    best_model.fc=nn.Identity()
     best_model.eval()
-    xis_embeddings = []
-    xjs_embeddings = []
+
+    classifier_embedding=[]
     with torch.no_grad():
-        for x1_raw, x2_raw in encoder_test_loader:
+        for x1_raw in tqdm(classifier_train_loader):
             x1_raw = x1_raw.to(device, dtype=torch.float)
-            xis = best_model(x1_raw)
-            x2_raw = x2_raw.to(device, dtype=torch.float)
-            xjs = best_model(x2_raw)
+            xis = best_model( x1_raw)
+            xis=nn.functional.normalize(xis,dim=1)
+            classifier_embedding.append(xis.cpu().detach().numpy())
+
+    test_embedding=[]
+    with torch.no_grad():
+        for x1_raw in tqdm(classifier_test_loader):
+            x1_raw = x1_raw.to(device, dtype=torch.float)
+            xis = best_model( x1_raw)
             xis = nn.functional.normalize(xis, dim=1)
-            xjs = nn.functional.normalize(xjs, dim=1)
-            xis_embeddings.append(xis.cpu().detach().numpy())
-            xjs_embeddings.append(xjs.cpu().detach().numpy())
+            test_embedding.append(xis.cpu().detach().numpy())
 
-        xis_embeddings = np.concatenate(xis_embeddings)
-        xjs_embeddings = np.concatenate(xjs_embeddings)
-        accuracy = accuracy_fun(xis_embeddings, xjs_embeddings,distance=distance_fun)
+    classifier_embedding=np.concatenate(classifier_embedding)
+    test_embedding=np.concatenate(test_embedding)
 
-        best_model.fc=nn.Identity()
-        best_model.eval()
-
-        classifier_embedding=[]
-        with torch.no_grad():
-            for x1_raw in tqdm(classifier_train_loader):
-                x1_raw = x1_raw.to(device, dtype=torch.float)
-                xis = best_model( x1_raw)
-                xis=nn.functional.normalize(xis,dim=1)
-                classifier_embedding.append(xis.cpu().detach().numpy())
-
-        test_embedding=[]
-        with torch.no_grad():
-            for x1_raw in tqdm(classifier_test_loader):
-                x1_raw = x1_raw.to(device, dtype=torch.float)
-                xis = best_model( x1_raw)
-                xis = nn.functional.normalize(xis, dim=1)
-                test_embedding.append(xis.cpu().detach().numpy())
-
-        classifier_embedding=np.concatenate(classifier_embedding)
-        test_embedding=np.concatenate(test_embedding)
-
-        joblib.dump((classifier_embedding,test_embedding,train,test),
-                    os.path.join(data_dir,f"results/{experiment}.joblib"))
+    joblib.dump((classifier_embedding,test_embedding,train,test),
+                os.path.join(data_dir,f"results/{experiment}.joblib"))
 
 
 
