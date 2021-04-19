@@ -23,7 +23,7 @@ from settings import data_dir
 import itertools
 
 
-experiment="Contrastive-original-sample-DotProduct32"
+experiment="Contrastive-original-sample-DotProduct32-sepsis"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
