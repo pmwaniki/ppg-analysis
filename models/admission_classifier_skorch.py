@@ -154,7 +154,7 @@ grid_parameters = {
 # ('clf', base_clf),
 # ])
 
-clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123),
+clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123,shuffle=True),
                    verbose=1, n_jobs=jobs,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
