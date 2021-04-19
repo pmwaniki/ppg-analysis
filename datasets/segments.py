@@ -96,6 +96,7 @@ infrared_files=glob.glob(os.path.join(data_dir,"triage/documents/*infra.ts"))
 trend_files=glob.glob(os.path.join(data_dir,"triage/documents/*spo2trends.csv"))
 
 
+
 red_pattern=re.compile("documents/(.*)_spo2red")
 red_filenames={red_pattern.search(file).group(1):file for file in red_files}
 infrared_pattern=re.compile("documents/(.*)_spo2infra")
@@ -117,12 +118,89 @@ test_ids=np.setdiff1d(ids,train_ids)
 shutil.rmtree(os.path.join(data_dir,"segments"),ignore_errors=True)
 os.makedirs(os.path.join(data_dir,"segments"),exist_ok=True)
 
+sepsis_red_files=glob.glob(os.path.join(data_dir,"6-60m_Observation_Cohort_PulseOx/*spo2red*.txt"))
+sepsis_infrared_files=glob.glob(os.path.join(data_dir,"6-60m_Observation_Cohort_PulseOx/*spo2infra*.txt"))
+sepsis_trend_files=glob.glob(os.path.join(data_dir,"6-60m_Observation_Cohort_PulseOx/*spo2trends*.csv"))
+
+sepsis_id_pattern=re.compile("6-60m_Observation_Cohort_PulseOx/(.*)_hospitalization_an_arm_1_spo2red(\d)_wav_oxi_(.*).txt")
+sepsis_ids=list(set([sepsis_id_pattern.search(file).group(1) for file in sepsis_red_files]))
+
+segment_data_sepsis=[]
+for id in sepsis_ids:
+    for eps in ['adm','dis']:
+        pos=0
+        for reading in [1,2]:
+            try:
+                trend_data = pd.read_csv(os.path.join(data_dir,f"6-60m_Observation_Cohort_PulseOx/{id}_hospitalization_an_arm_1_spo2trends{reading}_oxi_{eps}.csv"), skiprows=1)
+                red_sig = pd.read_csv(os.path.join(data_dir,
+                                                   f"6-60m_Observation_Cohort_PulseOx/{id}_hospitalization_an_arm_1_spo2red{reading}_wav_oxi_{eps}.txt"),
+                                      names=['ss'])
+                infrared_sig = pd.read_csv(os.path.join(data_dir,
+                                                        f"6-60m_Observation_Cohort_PulseOx/{id}_hospitalization_an_arm_1_spo2infra{reading}_wav_oxi_{eps}.txt"),
+                                           names=['ss'])
+
+
+            except FileNotFoundError:
+                print(f"Reading for {id} - {eps} - {reading} not found. Skipping ...")
+                continue
+            red_sig=red_sig.iloc[:,0].values
+            infrared_sig=infrared_sig.iloc[:,0].values
+            # signal_lengths.append((len(red_sig1), len(infrared_sig1)))
+            if (len(red_sig) < 1000) | (len(infrared_sig) < 1000):
+                print("record %s has insuffient samples. skiping ..." % id)
+                continue
+            if fs != 80:
+                red_sig_b = resample(red_sig, 80, fs)
+                infrared_sig_b = resample(infrared_sig, 80, fs)
+            else:
+                red_sig_b = red_sig
+                infrared_sig_b = infrared_sig
+
+            # red_segments = []
+            # infrared_segments = []
+            j = 0
+            # pos = 0
+            while True:
+                if j + samples > len(red_sig_b): break
+
+                trend_seg = trend_data.loc[(trend_data['Time'] >= (j / fs)) & (trend_data['Time'] <= ((j + samples) / fs))]
+                trend_seg = trend_seg[trend_seg[' SQI'] >= sqi_min]
+                if trend_seg.shape[0] == 0:
+                    # print("Segment with low sqi. Skipping ...")
+                    # low_sqi_segments += 1
+                    j += (slide * fs)
+                    continue
+                seg = {
+                    'id': id,
+                    'episode':eps,
+                    'reading':reading,
+                    # 'admitted': (data.loc[data['Study No'] == id, "Was child admitted (this illness)?"].values[
+                    #                  0] == "Yes") * 1.0,
+                    # 'died': (data2.loc[data2['Study No'] == id, "died"].values[0] == "Died"),
+                    'sqi': trend_seg[' SQI'].median(),
+                    'hr': trend_seg[' HeartRate'].median(),
+                    # 'resp_rate': data2.loc[data2['Study No'] == id, "Respiratory rate- RR (per minute)"].values[0],
+                    'spo2': trend_seg[' Saturation'].median(),
+                    'perfusion': trend_seg[' Perfusion'].median()}
+
+                joblib.dump({'id': id,
+                             'red': list(red_sig_b[j:j + samples]),
+                             'infrared': list(infrared_sig_b[j:j + samples]), },
+                            filename=os.path.join(data_dir, f"segments-sepsis/sepsis-{id}-{eps}{reading}-{pos}.joblib"))
+
+                seg['filename'] = os.path.join(data_dir, f"segments-sepsis/sepsis-{id}-{eps}{reading}-{pos}.joblib")
+                seg['position'] = pos
+                segment_data_sepsis.append(seg)
+                j += (slide * fs)
+                pos += 1
+segment_data_sepsis2=pd.DataFrame(segment_data_sepsis)
+segment_data_sepsis2.to_csv(os.path.join(data_dir,"segments-sepsis.csv"),index=False)
+
+
 if __name__ == "__main__":
-    # segments.delete_many({})
     low_sqi_segments=0
     segment_data=[]
     signal_lengths=[]
-    # mongo_id=1
     for id in ids:
         trend_data = pd.read_csv(trend_filnames[id], skiprows=1)
         red_sig = read_float(red_filenames[id])
