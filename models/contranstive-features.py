@@ -23,16 +23,19 @@ from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
+from sklearn.neighbors import KNeighborsClassifier
 
+from models.cnn.networks import resnet50_1d,EncoderRaw,wideresnet50_1d
 from datasets.loaders import TriageDataset,TriagePairs
 from utils import save_table3
 
 
-from models.contrastive_resnet import get_model,accuracy_fun
+# from models.contrastive_resnet import get_model,accuracy_fun
 
 display=os.environ.get("DISPLAY",None)
-experiment="Contrastive-sample-DotProduct32"
-trial_dir=os.path.join(log_dir,"contrastive",experiment)
+experiment="Contrastive-original-sample-DotProduct32-sepsis"
+res_type=experiment.split("-")[1]
+trial_dir=os.path.join(log_dir,experiment)
 weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}.pt")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
@@ -66,8 +69,8 @@ classifier_test_dataset=TriageDataset(test_full,normalize=True)
 classifier_test_loader=DataLoader(classifier_test_dataset,batch_size=16,shuffle=False,num_workers=5)
 
 analysis=Analysis(trial_dir)
-score="loss"
-mode="min"
+score="accuracy"
+mode="max"
 best_trial=analysis.get_best_logdir(score,mode)
 best_dir=analysis.get_best_logdir(score,mode)
 best_data=analysis.dataframe(score,mode)
@@ -82,6 +85,25 @@ torch.save(model_state,weights_file)
 # device="cpu"
 # best_config={'representation_size':64,'dropout':0.0,'enc_output_size':32}
 # model_state=torch.load("/home/pmwaniki/data/ppg/results/weights/Contrastive_Contrastive-DotProduct.pt")
+def get_model(config):
+    if res_type == "original":
+        base_model = resnet50_1d(num_classes=32)
+    elif res_type == "wide":
+        base_model = wideresnet50_1d(num_classes=32)
+
+    model = EncoderRaw(base_model, representation_size=config['representation_size'],
+                       dropout=config['dropout'], num_classes=config['enc_output_size'])
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # model = model.to(device)
+    return model
+
+def accuracy_fun(xis_embeddings, xjs_embeddings, distance="minkowski"):
+    knn = KNeighborsClassifier(n_neighbors=1,metric=distance)
+    knn.fit(xis_embeddings, np.arange(xis_embeddings.shape[0]))
+    knn_pred = knn.predict(xjs_embeddings)
+    accuracy = np.mean(np.arange(xis_embeddings.shape[0]) == knn_pred)
+    return accuracy
+
 model=get_model(best_config)
 
 
