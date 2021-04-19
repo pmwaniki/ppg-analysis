@@ -169,6 +169,7 @@ class Resnet1D(nn.Module):
         self.bn1=norm_layer(self.in_planes)
         self.relu=nn.ReLU(inplace=True)
         self.maxpool=nn.MaxPool1d(kernel_size=7,stride=3,padding=3)
+        # self.maxpool=nn.AvgPool1d(kernel_size=7,stride=3,padding=3)
         self.layer1=self._make_layer(block,planes=64,blocks=layers[0],stride=1)
         self.layer2=self._make_layer(block,planes=128,blocks=layers[1],stride=2)
         self.layer3=self._make_layer(block,planes=256,blocks=layers[2],stride=2)
@@ -356,7 +357,7 @@ def resnet50_1d(num_classes=1,norm_layer=None,**kwargs):
     # kwargs['width_per_group'] = 64 * 2
     model=Resnet1D(block=Bottleneck_1d,
                    layers=[3, 4, 6, 3],
-                   # layers=[3,8,24,3],
+                   # layers=[2,2,2,2],
                    num_classes=num_classes,
                    norm_layer=norm_layer,
                    **kwargs)
