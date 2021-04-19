@@ -1,10 +1,8 @@
 from torch.utils.data import Dataset
-# from datasets.mongo import get_by_id
 import joblib
 import numpy as np
 import torch
-# from pymongo import MongoClient
-from settings import Mongo,segment_length,segment_slide
+from settings import segment_length,segment_slide
 
 
 def normalize(x,mean=[0.3,0.6],std=[0.09,0.13]):
@@ -22,37 +20,32 @@ def normalize(x,mean=[0.3,0.6],std=[0.09,0.13]):
 
 
 class TriageDataset(Dataset):
-    def __init__(self,data,labels=None,stft_fun=None,transforms=None,aug_raw=[],normalize=False):
+    def __init__(self,data,labels=None,stft_fun=None,transforms=None,aug_raw=[],normalize=False,sample_by=None):
         self.data=data
         self.aug_raw=aug_raw
         self.normalize=normalize
         self.labels=labels
         self.stft_fun=stft_fun
         self.transforms=transforms
+        self.sample_by=sample_by
+        if self.sample_by:
+            self.unique_ids=self.data[self.sample_by].unique()
         # self.client = MongoClient('mongodb://%s:%s@%s' % (Mongo.user.value, Mongo.password.value,Mongo.host.value),
         #                           connect=False)
 
 
     def __len__(self):
+        if self.sample_by:
+            return len(self.unique_ids)
         return self.data.shape[0]
 
     def __getitem__(self, item):
-        row=self.data.iloc[item,:]
+        if self.sample_by:
+            row=self.data.loc[self.data[self.sample_by]==self.unique_ids[item],:].sample(1).iloc[0,:]
+        else:
+            row=self.data.iloc[item,:]
         ppg = joblib.load(row['filename'])
-        # while True:
-        #     i=0
-        #     try:
-        #         # ppg = getTriageSegment(row['seg_id'])
-        #         triage = self.client["triage"]
-        #         segments = triage.segments
-        #
-        #         break
-        #     except Exception as e:
-        #         print(f"failed to fetch item {item}, retrying ...")
-        #         raise e
-        #         # if i>10:
-        #         #     raise Exception(f"Failed to fectch item {item} after 10 tries")
-        #     i=i+1
+
 
 
         red,infrared=np.array(ppg["red"]),np.array(ppg["infrared"])
@@ -98,8 +91,7 @@ class TriagePairs(Dataset):
         self.raw_aug=aug_raw
         self.normalize=normalize
         self.pretext=pretext
-        # self.client = MongoClient('mongodb://%s:%s@%s' % (Mongo.user.value, Mongo.password.value,Mongo.host.value),
-        #                           connect=False)
+
         if overlap:
             self.position_distance=0
         else:
@@ -127,29 +119,6 @@ class TriagePairs(Dataset):
             ppg2 = ppg1
         elif self.pretext == "sample":
             ppg2 = joblib.load(sample_rows.iloc[1]['filename'])
-
-        # while True:
-        #     i=0
-        #     try:
-        #         triage = self.client["triage"]
-        #         segments = triage.segments
-        #         ppg1=get_by_id(sample_rows.iloc[0]['seg_id'],segments)
-        #         if self.pretext=="augment":
-        #             ppg2=ppg1
-        #         elif self.pretext=="sample":
-        #             ppg2 = get_by_id(sample_rows.iloc[1]['seg_id'], segments)
-        #         if ppg1 is None:
-        #             print(f"Failed to fetch ppg segment {sample_rows.iloc[0]['seg_id']}. Try {i}")
-        #             raise Exception(f"Failed to fetch ppg segment {sample_rows.iloc[0]['seg_id']}. Try {i}")
-        #         if ppg2 is None:
-        #             print(f"Failed to fetch ppg segment {sample_rows.iloc[1]['seg_id']}. Try {i}")
-        #             raise Exception(f"Failed to fetch ppg segment {sample_rows.iloc[1]['seg_id']}. Try {i}")
-        #         break
-        #     except Exception as e:
-        #         print(f"failed to fetch item {item}, retrying ...")
-        #         if i>=10:
-        #             raise Exception(f"Failed to fectch item {item} after 10 tries")
-        #     i=i+1
 
 
         red1,infrared1=ppg1["red"],ppg1["infrared"]
