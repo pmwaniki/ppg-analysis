@@ -46,18 +46,26 @@ display=os.environ.get('DISPLAY',None) is not None
 # enc_l2_=5e-4
 # enc_l1_=0.001
 # dropout_=0.05
+include_sepsis=True
 enc_representation_size="32"
 res_type="original" # wide,original
 enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
 experiment=f"Contrastive-{res_type}-{pretext}-{enc_distance}{enc_representation_size}"
+if include_sepsis: experiment = experiment + "-sepsis"
 
 
 # weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
 # details_=f"z{enc_representation_size}_l2{enc_l2_}_x{enc_output_size}_lr{enc_lr_}_bs{enc_batch_size}"
 #
 #
+if include_sepsis:
+    sepsis_segments=pd.read_csv(os.path.join(data_dir,"segments-sepsis.csv"))
+    sepsis_segments['id']=sepsis_segments['id'] + "-" + sepsis_segments['episode']
+    non_repeated_ids = [k for k, v in sepsis_segments['id'].value_counts().items() if v <= 15]
+    sepsis_segments = sepsis_segments[~sepsis_segments['id'].isin(non_repeated_ids)]
+
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
 triage_segments=pd.read_csv(os.path.join(data_dir,'triage/segments.csv'))
 # triage_segments['label']=pd.factorize(triage_segments['id'])[0]
@@ -102,41 +110,7 @@ classifier_train_loader=DataLoader(classifier_train_dataset,batch_size=16,shuffl
 classifier_test_dataset=TriageDataset(test,normalize=True)
 classifier_test_loader=DataLoader(classifier_test_dataset,batch_size=16,shuffle=False,num_workers=5)
 #
-# iter_ = iter(encoder_train_loader)
-# x1_raw,  x2_raw = iter_.next()
-# print("Input shape", x1_raw.shape)
-#
-# if display:
-#     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
-#
-#     for r in range(2):
-#         for c in range(3):
-#             axs[r, c].plot(x1_raw.numpy()[c, r, :],
-#                              # vmin=batch_x.numpy()[:, r, :, :].min(),
-#                              # vmax=batch_x.numpy()[:, r, :, :].max(),
-#                              # norm=colors.LogNorm()
-#                              )
-#
-#     plt.show()
-# if display:
-#     fig, axs = plt.subplots(4, 3, figsize=(12, 5))
-#     for r in range(2):
-#         for c in range(3):
-#             axs[r * 2 + 1, c].imshow(x1_stft.numpy()[c, r, :, :],
-#                                      # vmin=batch_x.numpy()[:, r, :, :].min(),
-#                                      # vmax=batch_x.numpy()[:, r, :, :].max(),
-#                                      norm=colors.LogNorm()
-#                                      )
-#             axs[r * 2 + 1, c].invert_yaxis()
-#     for r in range(2):
-#         for c in range(3):
-#             axs[r * 2, c].plot(x1_raw.numpy()[c, r, :],
-#                                # vmin=batch_x.numpy()[:, r, :, :].min(),
-#                                # vmax=batch_x.numpy()[:, r, :, :].max(),
-#                                # norm=colors.LogNorm()
-#                                )
-#
-#     plt.show()
+
 
 
 
@@ -157,6 +131,8 @@ def get_loader(config):
     np.random.seed(123)
     train_ids = np.random.choice(all_ids, size=int(len(all_ids) * 0.85), replace=False)
     train_csv = train_encoder[train_encoder['id'].isin(train_ids)]
+    if include_sepsis:
+        train_csv=pd.concat([train_csv,sepsis_segments],axis=0)
     val_csv = train_encoder[~train_encoder['id'].isin(train_ids)]
     train_ds=TriagePairs(train_csv, id_var="id", stft_fun=None,
                                         transforms=None,
@@ -175,10 +151,10 @@ def get_loader(config):
 
     train_loader = DataLoader(train_ds,
                               batch_size=int(config["batch_size"]),
-                              shuffle=True, num_workers=50)
+                              shuffle=True, num_workers=20)
     val_loader = DataLoader(val_ds,
                             batch_size=int(config["batch_size"]),
-                            shuffle=False, num_workers=50)
+                            shuffle=False, num_workers=20)
     return train_loader,val_loader
 
 def get_model(config):
@@ -358,12 +334,12 @@ result = tune.run(
     # metric='loss',
     # mode='min',
     checkpoint_at_end=True,
-    resources_per_trial={"cpu": 2, "gpu": 0.15},
+    resources_per_trial={"cpu": 4, "gpu": 0.3},
     config=configs,
     local_dir=log_dir,
     num_samples=500,
     name=experiment,
-    # resume=True,
+    resume=False,
     scheduler=scheduler,
     progress_reporter=reporter,
     reuse_actors=False,
