@@ -60,14 +60,15 @@ regressor_hr=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=Tru
 hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
                 'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
          'poly__degree':[2,],
-         'poly__interaction_only':[False],
-         'select__percentile': [3, 6, 10, 15, 20, 30, 40, 60,100],
+#          'poly__interaction_only':[False],
+         'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
          'select__score_func':[mutual_info_regression,]
         }
 pipeline_hr = Pipeline([
     ('variance_threshold',VarianceThreshold()),
-    ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
+    ('poly', PolynomialFeatures(interaction_only=False, include_bias=False)),
+    
     ('scl', StandardScaler()),
     ('clf', TransformedTargetRegressor(regressor=regressor_hr,
                                        #                                       transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000),
@@ -75,7 +76,7 @@ pipeline_hr = Pipeline([
                                        )),
 ])
 
-hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10,random_state=123),n_jobs=cores,
+hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
                     refit='r2',verbose=1)
 hr_clf.fit(classifier_embedding_reduced[hr_train!=0,:],hr_train[hr_train!=0])
@@ -117,8 +118,9 @@ regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopp
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
     ('variance_threshold',VarianceThreshold()),
-    ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     ('select',SelectPercentile()),
+    ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
+    
     ('scl', StandardScaler()),
     ('clf',TransformedTargetRegressor(regressor=regressor_resp_rate,
 #                                       transformer=QuantileTransformer(output_distribution="normal", n_quantiles=500),
@@ -136,10 +138,10 @@ resp_rate_grid = {
     # 'pca__n_components':[2,4,8,16,32],
     'poly__degree': [2, ],
     'poly__interaction_only': [ False,],
-    'select__percentile': [ 10, 15, 20, 30, 40, 60, ],
+    'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
     'select__score_func': [mutual_info_regression, ]
 }
-resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10,random_state=123),n_jobs=cores,
+resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
                     refit='r2',verbose=1)
 resp_rate_clf.fit(classifier_embedding_reduced[~np.isnan(resp_rate_train),:],resp_rate_train[~np.isnan(resp_rate_train)])
@@ -174,7 +176,7 @@ pw_transformer=PowerTransformer(method='box-cox',standardize=True)
 plt.hist(pw_transformer.fit_transform(spo2_train[spo2_train>70].reshape(-1,1)))
 plt.show()
 
-q_transformer=QuantileTransformer(n_quantiles=5)
+q_transformer=QuantileTransformer(n_quantiles=20)
 plt.hist(q_transformer.fit_transform(spo2_train[spo2_train>70].reshape(-1,1)))
 plt.show()
 
@@ -184,12 +186,13 @@ regressor_spo2=SGDRegressor(loss='squared_loss',max_iter=500000,early_stopping=T
 pipeline_spo2 = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     # ('pca',PCA()),
-    ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     ('select', SelectPercentile()),
+    ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
+    
     ('scl', StandardScaler()),
     ('clf', TransformedTargetRegressor(regressor=regressor_spo2,
-                                       # transformer=QuantileTransformer(output_distribution="normal", n_quantiles=20),
-                                       # transformer=PowerTransformer(method='box-cox',standardize=True),
+#                                        transformer=QuantileTransformer(output_distribution="normal", n_quantiles=20),
+#                                        transformer=PowerTransformer(method='box-cox',standardize=True),
                                        func=identity_fun, inverse_func=identity_fun,
                                        )),
 ])
@@ -203,13 +206,13 @@ spo2_grid = {
              # 'pca__n_components':[2,4,8,16,32],
              'poly__degree': [2, ],
              'poly__interaction_only': [ False,],
-             'select__percentile': [ 10, 15, 20, 30, 40, 60, ],
+             'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
              'select__score_func': [mutual_info_regression, ],
              }
-spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10,random_state=123),n_jobs=cores,
+spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
                     scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
                     refit='r2',error_score=-1.0,verbose=1)
-spo2_clf.fit(classifier_embedding_reduced[spo2_train>70,:],spo2_train[spo2_train>70])
+spo2_clf.fit(classifier_embedding_reduced[spo2_train>80,:],spo2_train[spo2_train>80])
 
 cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
                               'rmse':spo2_clf.cv_results_['mean_test_neg_root_mean_squared_error'],
@@ -220,12 +223,12 @@ cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
 print(cv_results_spo2)
 
 test_pred_spo2=spo2_clf.predict(test_embedding_reduced)
-r2_spo2=r2_score(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
-rmse_spo2=mean_squared_error(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70],squared=False)
+r2_spo2=r2_score(spo2_test[spo2_test>80],test_pred_spo2[spo2_test>80])
+rmse_spo2=mean_squared_error(spo2_test[spo2_test>80],test_pred_spo2[spo2_test>80],squared=False)
 
 fig2,ax2=plt.subplots(1)
-ax2.scatter(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
-ax2.plot([70,100],[70,100],'r--')
+ax2.scatter(spo2_test[spo2_test>80],test_pred_spo2[spo2_test>80])
+ax2.plot([80,100],[80,100],'r--')
 ax2.set_xlabel("Observed")
 ax2.set_ylabel("Predicted")
 ax2.set_title("SPO2")
@@ -248,8 +251,8 @@ rmse_rest_rate=mean_squared_error(resp_rate_test[~np.isnan(resp_rate_test)],test
 
 spo2_clf=joblib.load(os.path.join(data_dir,f"results/weights/Regression_spo2_{experiment}.joblib"))
 test_pred_spo2=spo2_clf.predict(test_embedding_reduced)
-r2_spo2=r2_score(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70])
-rmse_spo2=mean_squared_error(spo2_test[spo2_test>70],test_pred_spo2[spo2_test>70],squared=False)
+r2_spo2=r2_score(spo2_test[spo2_test>80],test_pred_spo2[spo2_test>80])
+rmse_spo2=mean_squared_error(spo2_test[spo2_test>80],test_pred_spo2[spo2_test>80],squared=False)
 
 
 fig,axs=plt.subplots(1,3,figsize=(12,4))
@@ -271,7 +274,7 @@ axs[1].set_xlabel("Predicted")
 axs[1].set_title("Respiratory rate")
 
 axs[2].scatter(test_pred_spo2[spo2_test>70],spo2_test[spo2_test>70],)
-axs[2].plot([70,100],[70,100],'r--')
+axs[2].plot([80,100],[80,100],'r--')
 axs[2].text(0.05,0.9,f"r2={r2_spo2:.2f}\nrmse={rmse_spo2:.1f}",transform=axs[2].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
 axs[2].set_ylabel("Observed")
