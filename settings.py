@@ -14,7 +14,7 @@ try:
 except:
     pass
 
-if os.uname()[1]=='kenbo-cen07':
+if (os.uname()[1]=='kenbo-cen07') | (os.uname()[1]=='kenbo-cen05'):
     data_dir="/home/local/KWTRP/pmwaniki/data/ppg"
 weights_dir=os.path.join(data_dir,"results/weights")
 checkpoint_dir="/home/pmwaniki/data/logs/ppg/"
