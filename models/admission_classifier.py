@@ -13,9 +13,10 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures
 from sklearn.feature_selection import SelectKBest,f_classif,mutual_info_classif,SelectPercentile,VarianceThreshold,RFECV
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
-from sklearn.linear_model import LogisticRegression,LinearRegression,SGDClassifier
+from sklearn.linear_model import LogisticRegression,SGDClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC,SVR
+from sklearn.ensemble import BaggingClassifier
+# from sklearn.svm import SVC,SVR
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV,RepeatedStratifiedKFold
 from settings import data_dir,weights_dir
@@ -41,31 +42,32 @@ admitted_train=np.stack(map(lambda id:train.loc[train['id']==id,'admitted'].iat[
 admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],test_ids))
 
 
-base_clf=SGDClassifier(loss='modified_huber',
-                       class_weight='balanced',
-                       penalty='l2',
-                       early_stopping=False,
-#                        validation_fraction=0.05,n_iter_no_change=20,
-                       max_iter=100,random_state=123)
+# base_clf=SGDClassifier(loss='modified_huber',
+#                        class_weight='balanced',
+#                        penalty='l2',
+#                        early_stopping=False,
+# #                        validation_fraction=0.05,n_iter_no_change=20,
+#                        max_iter=100,random_state=123)
                        # n_iter_no_change=20,
-# base_clf=LogisticRegression(
-#     # penalty='elasticnet',
-#     max_iter=500000,
-#     random_state=56,
-#     # solver='saga',
-#     class_weight='balanced')
+base_clf=LogisticRegression(
+    penalty='elasticnet',
+    max_iter=500000,
+    random_state=None,
+    solver='saga',
+    class_weight='balanced')
 
-
+bagging=BaggingClassifier(base_estimator=base_clf,)
 
 
 grid_parameters = {
-    # 'clf__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,1e-4],
-    # 'clf__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
+    'clf__base_estimator__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,5e-3,1e-4,5e-4,1e-5,5e-5,1e-6,5e-6],
+    'clf__base_estimator__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
+#     'clf__penalty': ['l2'],
 
 
-    'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
-    'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
-    'clf__max_iter':[5,10,50,100,200,500],
+#     'clf__alpha': [1e-4,1e-3,1e-2,1e-1,1.0,10.0,100.0],
+#     'clf__eta0': [0.00001,0.0001,0.001,0.01,.1,1.0],
+#     'clf__max_iter':[5,10,50,100,200,500],
 #     'clf__loss': ['modified_huber'],
 #     'clf__learning_rate': [ 'adaptive',],
 #     'poly__degree': [2, ],
@@ -79,13 +81,14 @@ grid_parameters = {
 
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
-    ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
     ('select', SelectPercentile(mutual_info_classif)),
+    ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
+    
     ('scl', StandardScaler()),
-    ('clf', base_clf),
+    ('clf', bagging),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123,shuffle=True),
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123,shuffle=True),
                    verbose=1, n_jobs=cores,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
