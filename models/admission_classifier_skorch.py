@@ -36,7 +36,7 @@ from utils import save_table3
 rng=np.random.RandomState(123)
 device="cuda" if torch.cuda.is_available() else "cpu"
 jobs= 6 if device=="cuda" else multiprocessing.cpu_count()-2
-experiment="Contrastive-wide-sample-DotProduct32"
+experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -126,7 +126,7 @@ base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=100, lr=0.01,
 
 
 grid_parameters = {
-    'lr':[0.01,0.001,0.0001,0.00001],
+    'lr':[0.01,0.001,0.0001,0.00001,0.000001],
     # 'criterion__pos_weight':[torch.tensor(3.0)],
     'optimizer__weight_decay':[0.00001,0.0001,0.001,0.01,0.1,1.0,10.0,100.0],
     'optimizer__momentum':[0.9,0.99],
@@ -154,7 +154,7 @@ grid_parameters = {
 # ('clf', base_clf),
 # ])
 
-clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(50 ,random_state=123,shuffle=True),
+clf = GridSearchCV(base_clf, param_grid=grid_parameters, cv=StratifiedKFold(5 ,random_state=123,shuffle=True),
                    verbose=1, n_jobs=jobs,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
