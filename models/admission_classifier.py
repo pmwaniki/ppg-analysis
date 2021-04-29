@@ -50,7 +50,7 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 #                        max_iter=100,random_state=123)
                        # n_iter_no_change=20,
 base_clf=LogisticRegression(
-    penalty='elasticnet',
+    penalty='l2',
     max_iter=500000,
     random_state=None,
     solver='saga',
@@ -60,8 +60,8 @@ bagging=BaggingClassifier(base_estimator=base_clf,)
 
 
 grid_parameters = {
-    'clf__base_estimator__C': [1.0,5e-1,1e-1,5e-2,1e-2,1e-3,5e-3,1e-4,5e-4,1e-5,5e-5,1e-6,5e-6],
-    'clf__base_estimator__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
+    'clf__base_estimator__C': [1.0,1e-1,1e-2,1e-3,1e-4,1e-5,1e-6],
+#     'clf__base_estimator__l1_ratio': [0.0, 0.25, 0.5, 0.75, 1.0],
 #     'clf__penalty': ['l2'],
 
 
@@ -73,7 +73,7 @@ grid_parameters = {
 #     'poly__degree': [2, ],
 
 #     'poly__interaction_only': [False,],
-    'select__percentile': [10, 15, 20, 30, 40, 60, 70,100],
+    'select__percentile': [ 20, 30, 40, 60, 70,100],
 #     'select__score_func': [mutual_info_classif, ],
     # 'clf__l1_ratio': [0.1, 0.3, 0.5, 0.8, 1.0],
 
