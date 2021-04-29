@@ -56,7 +56,7 @@ base_clf=LogisticRegression(
     solver='saga',
     class_weight='balanced')
 
-bagging=BaggingClassifier(base_estimator=base_clf,)
+bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=10,n_jobs=1)
 
 
 grid_parameters = {
@@ -89,7 +89,7 @@ pipeline = Pipeline([
 ])
 
 clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123,shuffle=True),
-                   verbose=1, n_jobs=cores,#n_iter=500,
+                   verbose=1, n_jobs=-1,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
                    )
