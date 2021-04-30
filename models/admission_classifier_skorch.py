@@ -34,7 +34,8 @@ from utils import save_table3
 
 
 rng=np.random.RandomState(123)
-device="cuda" if torch.cuda.is_available() else "cpu"
+# device="cuda" if torch.cuda.is_available() else "cpu"
+device='cpu'
 jobs= 6 if device=="cuda" else multiprocessing.cpu_count()-2
 experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
@@ -114,11 +115,35 @@ def make_loader(ds,**kwargs):
     loader=DataLoader(ds,sampler=sampler,**kwargs)
     return loader
 
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, smoothing=0.0):
+        """if smoothing == 0, it's one-hot method
+           if 0 < smoothing < 1, it's smooth method
+        """
+        super(LabelSmoothingLoss, self).__init__()
+        self.smoothing = smoothing
+        assert 0 <= self.smoothing < 1
 
+    def forward(self, pred, target):
+        with torch.no_grad():
+            true_dist =target * (1 - self.smoothing) + self.smoothing / 2
+        return torch.nn.functional.binary_cross_entropy_with_logits(pred,true_dist)
+
+class SmoothLoss(nn.BCEWithLogitsLoss):
+    def __init__(self,smoothing=0.0,**kwargs):
+        super(SmoothLoss, self).__init__(**kwargs)
+        self.smoothing=smoothing
+    def forward(self, input, target):
+        with torch.no_grad():
+            true_dist = target * (1 - self.smoothing) + self.smoothing / 2
+        return super().forward(input,true_dist)
 
 base_clf=NeuralNetBinaryClassifier(module=Net,max_epochs=100, lr=0.01,
                                    iterator_train=make_loader,train_split=None,
-                                   optimizer=optim.SGD,verbose=False,device=device,
+                                   optimizer=optim.SGD,
+                                   criterion=SmoothLoss,
+                                   verbose=False,
+                                   device=device,
                                    callbacks=[InputShapeSetter,])
 
 
@@ -130,6 +155,7 @@ grid_parameters = {
     # 'criterion__pos_weight':[torch.tensor(3.0)],
     'optimizer__weight_decay':[0.00001,0.0001,0.001,0.01,0.1,1.0,10.0,100.0],
     'optimizer__momentum':[0.9,0.99],
+    'criterion__smoothing':[0.0,0.1,0.2,0.3,0.5],
     # 'iterator_train__sampler':[sampler,],
 #     'iterator_train__shuffle':[False,],
     'batch_size':[32,64,128,256],
