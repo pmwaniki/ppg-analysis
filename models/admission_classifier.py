@@ -51,7 +51,7 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
                        # n_iter_no_change=20,
 base_clf=LogisticRegression(
     penalty='l2',
-    max_iter=500000,
+    max_iter=1000,
     random_state=None,
     solver='saga',
     class_weight='balanced')
@@ -82,7 +82,7 @@ grid_parameters = {
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('select', SelectPercentile(mutual_info_classif)),
-    ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
+    # ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
     
     ('scl', StandardScaler()),
     ('clf', bagging),
