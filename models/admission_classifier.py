@@ -52,11 +52,11 @@ admitted_test=np.stack(map(lambda id:test.loc[test['id']==id,'admitted'].iat[0],
 base_clf=LogisticRegression(
     penalty='l2',
     max_iter=1000,
-    random_state=None,
+    random_state=123,
     solver='saga',
     class_weight='balanced')
 
-bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=10,n_jobs=1)
+bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=50,n_jobs=1,random_state=123)
 
 
 grid_parameters = {
@@ -82,7 +82,7 @@ grid_parameters = {
 pipeline = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('select', SelectPercentile(mutual_info_classif)),
-    # ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
+#     ('poly', PolynomialFeatures(degree=2,interaction_only=False,include_bias=False)),
     
     ('scl', StandardScaler()),
     ('clf', bagging),
