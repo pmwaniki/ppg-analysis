@@ -56,10 +56,10 @@ def identity_fun(x):
 
 #******************************************************************************************************************
 
-regressor_hr=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True,random_state=123)
+regressor_hr=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
 hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
                 'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
-         'poly__degree':[2,],
+         # 'poly__degree':[2,],
 #          'poly__interaction_only':[False],
          'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
          'select__score_func':[mutual_info_regression,]
@@ -67,7 +67,7 @@ hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
 pipeline_hr = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('select', SelectPercentile()),
-    ('poly', PolynomialFeatures(interaction_only=False, include_bias=False)),
+    # ('poly', PolynomialFeatures(interaction_only=False, include_bias=False)),
     
     ('scl', StandardScaler()),
     ('clf', TransformedTargetRegressor(regressor=regressor_hr,
@@ -113,13 +113,13 @@ pw_transformer=PowerTransformer(method='box-cox')
 plt.hist(pw_transformer.fit_transform(resp_rate_train[~np.isnan(resp_rate_train)].reshape(-1,1)))
 plt.show()
 
-regressor_resp_rate=SGDRegressor(loss='squared_loss',max_iter=100000,early_stopping=True,random_state=123)
+regressor_resp_rate=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
 # regressor_resp_rate=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_resp_rate=Pipeline([
     ('variance_threshold',VarianceThreshold()),
     ('select',SelectPercentile()),
-    ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
+    # ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
     
     ('scl', StandardScaler()),
     ('clf',TransformedTargetRegressor(regressor=regressor_resp_rate,
@@ -131,13 +131,13 @@ pipeline_resp_rate=Pipeline([
 resp_rate_grid = {
     'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
                   'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-                  'clf__regressor__loss': ['squared_loss', 'huber'],
+                  # 'clf__regressor__loss': ['squared_loss', 'huber'],
     # 'clf__regressor__C': [1, 10, 100, 1000, 10000],
     # 'clf__regressor__kernel': ['linear', 'poly', 'rbf'],
     #                 'clf__transformer__n_quantiles':[200,300,500,700,900],
     # 'pca__n_components':[2,4,8,16,32],
-    'poly__degree': [2, ],
-    'poly__interaction_only': [ False,],
+    # 'poly__degree': [2, ],
+    # 'poly__interaction_only': [ False,],
     'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
     'select__score_func': [mutual_info_regression, ]
 }
@@ -180,14 +180,14 @@ q_transformer=QuantileTransformer(n_quantiles=20)
 plt.hist(q_transformer.fit_transform(spo2_train[spo2_train>70].reshape(-1,1)))
 plt.show()
 
-regressor_spo2=SGDRegressor(loss='squared_loss',max_iter=500000,early_stopping=True,random_state=123)
+regressor_spo2=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
 # regressor_spo2=SVR()
 # regressor=Lasso(max_iter=50000)
 pipeline_spo2 = Pipeline([
     ('variance_threshold',VarianceThreshold()),
     # ('pca',PCA()),
     ('select', SelectPercentile()),
-    ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
+    # ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
     
     ('scl', StandardScaler()),
     ('clf', TransformedTargetRegressor(regressor=regressor_spo2,
@@ -199,13 +199,13 @@ pipeline_spo2 = Pipeline([
 spo2_grid = {
     'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
              'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-             'clf__regressor__loss':['squared_loss','huber'],
+             # 'clf__regressor__loss':['squared_loss','huber'],
              # 'clf__regressor__C':[1,10,100,1000,10000],
              # 'clf__regressor__kernel':['linear', 'poly', 'rbf'],
              # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
              # 'pca__n_components':[2,4,8,16,32],
-             'poly__degree': [2, ],
-             'poly__interaction_only': [ False,],
+             # 'poly__degree': [2, ],
+             # 'poly__interaction_only': [ False,],
              'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
              'select__score_func': [mutual_info_regression, ],
              }
