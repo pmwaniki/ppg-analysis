@@ -13,6 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer,RobustScaler,PolynomialFeatures,PowerTransformer
 from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
 from sklearn.linear_model import Ridge,Lasso,LinearRegression,SGDRegressor
+from sklearn.ensemble import BaggingRegressor
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC,SVR
@@ -50,35 +51,38 @@ resp_rate_test=np.stack(map(lambda id:test.loc[test['id']==id,'resp_rate'].media
 spo2_train=np.stack(map(lambda id:train.loc[train['id']==id,'spo2'].median(skipna=True),train_ids))
 spo2_test=np.stack(map(lambda id:test.loc[test['id']==id,'spo2'].median(skipna=True),test_ids))
 
-def identity_fun(x):
-    return x
+def regressor():
+    base_regressor = SGDRegressor(loss='squared_loss', penalty='l2', max_iter=5000, early_stopping=False,
+                                random_state=123)
+    bagging_regressor = BaggingRegressor(base_estimator=base_regressor, n_estimators=10, random_state=123)
+    grid = {'clf__base_estimator__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
+               'clf__base_estimator__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
+               'clf__base_estimator__max_iter': [100, 500, 1000, 5000],
+               # 'poly__degree':[2,],
+               #          'poly__interaction_only':[False],
+               'select__percentile': [10, 15, 20, 30, 40, 60, 100],
+               'select__score_func': [mutual_info_regression, ]
+               }
+    pipeline = Pipeline([
+        ('variance_threshold', VarianceThreshold()),
+        ('select', SelectPercentile()),
+        ('poly', PolynomialFeatures(interaction_only=False, include_bias=False)),
+
+        ('scl', StandardScaler()),
+        ('clf', bagging_regressor),
+    ])
+
+    estimator = GridSearchCV(pipeline, param_grid=grid, cv=KFold(10, random_state=123, shuffle=True), n_jobs=cores,
+                          scoring=['explained_variance', 'neg_root_mean_squared_error', 'max_error', 'r2'],
+                          refit='r2', verbose=1)
+    return estimator
 
 
 #******************************************************************************************************************
 
-regressor_hr=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
-hr_grid={'clf__regressor__alpha':[1e-5,1e-4,1e-3,1e-2,1e-1,1.0,],
-                'clf__regressor__eta0':[0.00001,0.0001,0.001,0.01,0.1,],
-         # 'poly__degree':[2,],
-#          'poly__interaction_only':[False],
-         'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
-         'select__score_func':[mutual_info_regression,]
-        }
-pipeline_hr = Pipeline([
-    ('variance_threshold',VarianceThreshold()),
-    ('select', SelectPercentile()),
-    # ('poly', PolynomialFeatures(interaction_only=False, include_bias=False)),
-    
-    ('scl', StandardScaler()),
-    ('clf', TransformedTargetRegressor(regressor=regressor_hr,
-                                       #                                       transformer=QuantileTransformer(output_distribution="normal",n_quantiles=1000),
-                                       func=identity_fun, inverse_func=identity_fun
-                                       )),
-])
 
-hr_clf=GridSearchCV(pipeline_hr,param_grid=hr_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
-                    scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2',verbose=1)
+
+hr_clf=regressor()
 hr_clf.fit(classifier_embedding_reduced[hr_train!=0,:],hr_train[hr_train!=0])
 
 cv_results_hr=pd.DataFrame({'params':hr_clf.cv_results_['params'],
@@ -113,37 +117,9 @@ pw_transformer=PowerTransformer(method='box-cox')
 plt.hist(pw_transformer.fit_transform(resp_rate_train[~np.isnan(resp_rate_train)].reshape(-1,1)))
 plt.show()
 
-regressor_resp_rate=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
-# regressor_resp_rate=SVR()
-# regressor=Lasso(max_iter=50000)
-pipeline_resp_rate=Pipeline([
-    ('variance_threshold',VarianceThreshold()),
-    ('select',SelectPercentile()),
-    # ('poly',PolynomialFeatures(interaction_only=False,include_bias=False)),
-    
-    ('scl', StandardScaler()),
-    ('clf',TransformedTargetRegressor(regressor=regressor_resp_rate,
-#                                       transformer=QuantileTransformer(output_distribution="normal", n_quantiles=500),
-#                                       transformer=PowerTransformer(method='box-cox'),
-                                      func=identity_fun,inverse_func=identity_fun,
-                                      )),
-])
-resp_rate_grid = {
-    'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
-                  'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-                  # 'clf__regressor__loss': ['squared_loss', 'huber'],
-    # 'clf__regressor__C': [1, 10, 100, 1000, 10000],
-    # 'clf__regressor__kernel': ['linear', 'poly', 'rbf'],
-    #                 'clf__transformer__n_quantiles':[200,300,500,700,900],
-    # 'pca__n_components':[2,4,8,16,32],
-    # 'poly__degree': [2, ],
-    # 'poly__interaction_only': [ False,],
-    'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
-    'select__score_func': [mutual_info_regression, ]
-}
-resp_rate_clf=GridSearchCV(pipeline_resp_rate,param_grid=resp_rate_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
-                    scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2',verbose=1)
+
+
+resp_rate_clf=regressor()
 resp_rate_clf.fit(classifier_embedding_reduced[~np.isnan(resp_rate_train),:],resp_rate_train[~np.isnan(resp_rate_train)])
 
 cv_results_resp_rate=pd.DataFrame({'params':resp_rate_clf.cv_results_['params'],
@@ -180,38 +156,8 @@ q_transformer=QuantileTransformer(n_quantiles=20)
 plt.hist(q_transformer.fit_transform(spo2_train[spo2_train>70].reshape(-1,1)))
 plt.show()
 
-regressor_spo2=SGDRegressor(loss='squared_loss',penalty='l2',max_iter=5000,early_stopping=False,random_state=123)
-# regressor_spo2=SVR()
-# regressor=Lasso(max_iter=50000)
-pipeline_spo2 = Pipeline([
-    ('variance_threshold',VarianceThreshold()),
-    # ('pca',PCA()),
-    ('select', SelectPercentile()),
-    # ('poly', PolynomialFeatures(interaction_only=True, include_bias=False)),
-    
-    ('scl', StandardScaler()),
-    ('clf', TransformedTargetRegressor(regressor=regressor_spo2,
-#                                        transformer=QuantileTransformer(output_distribution="normal", n_quantiles=20),
-#                                        transformer=PowerTransformer(method='box-cox',standardize=True),
-                                       func=identity_fun, inverse_func=identity_fun,
-                                       )),
-])
-spo2_grid = {
-    'clf__regressor__alpha': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, ],
-             'clf__regressor__eta0': [0.00001, 0.0001, 0.001, 0.01, 0.1, ],
-             # 'clf__regressor__loss':['squared_loss','huber'],
-             # 'clf__regressor__C':[1,10,100,1000,10000],
-             # 'clf__regressor__kernel':['linear', 'poly', 'rbf'],
-             # 'clf__transformer__n_quantiles':[5,20,200,300,500,700,900],
-             # 'pca__n_components':[2,4,8,16,32],
-             # 'poly__degree': [2, ],
-             # 'poly__interaction_only': [ False,],
-             'select__percentile': [ 10, 15, 20, 30, 40, 60, 100],
-             'select__score_func': [mutual_info_regression, ],
-             }
-spo2_clf=GridSearchCV(pipeline_spo2,param_grid=spo2_grid,cv=KFold(10,random_state=123,shuffle=True),n_jobs=cores,
-                    scoring=['explained_variance','neg_root_mean_squared_error','max_error','r2'],
-                    refit='r2',error_score=-1.0,verbose=1)
+
+spo2_clf=regressor()
 spo2_clf.fit(classifier_embedding_reduced[spo2_train>80,:],spo2_train[spo2_train>80])
 
 cv_results_spo2=pd.DataFrame({'params':spo2_clf.cv_results_['params'],
