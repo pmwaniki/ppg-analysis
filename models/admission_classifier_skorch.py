@@ -37,7 +37,7 @@ rng=np.random.RandomState(123)
 # device="cuda" if torch.cuda.is_available() else "cpu"
 device='cpu'
 jobs= 6 if device=="cuda" else multiprocessing.cpu_count()-2
-experiment="Contrastive-original-sample-DotProduct32"
+experiment="Contrastive-original-sample-DotProduct32-sepsis"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 

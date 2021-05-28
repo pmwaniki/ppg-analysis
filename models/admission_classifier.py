@@ -56,7 +56,7 @@ base_clf=LogisticRegression(
     solver='saga',
     class_weight='balanced')
 
-bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=50,n_jobs=1,random_state=123)
+bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=10,n_jobs=1,random_state=123)
 
 
 grid_parameters = {
@@ -88,7 +88,7 @@ pipeline = Pipeline([
     ('clf', bagging),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123,shuffle=True),
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=None,shuffle=False),
                    verbose=1, n_jobs=-1,#n_iter=500,
                    scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
                    return_train_score=True,
@@ -102,9 +102,13 @@ cv_results=pd.DataFrame({'params':clf.cv_results_['params'], 'auc':clf.cv_result
               'acc':clf.cv_results_['mean_test_balanced_accuracy'],'recall':clf.cv_results_['mean_test_recall'],
                           'precision':clf.cv_results_['mean_test_precision'],
                          'f1':clf.cv_results_['mean_test_f1']})
-print(cv_results)
+# print(cv_results)
+print("Best params: ", clf.best_params_)
+print("Best score: ", clf.best_score_)
 
 test_pred=clf.predict_proba(test_embedding)[:,1]
+test_pred_reduced=clf.predict_proba(test_embedding_reduced)[:,1]
+roc_auc_score(admitted_test,test_pred_reduced)
 
 print(classification_report(test['admitted'],test_pred>0.5))
 print("AUC: ",roc_auc_score(test['admitted'],test_pred))
