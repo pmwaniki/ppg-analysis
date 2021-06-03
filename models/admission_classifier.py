@@ -27,13 +27,17 @@ from utils import save_table3
 
 # rng=np.random.RandomState(123)
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-original-sample-DotProduct32-sepsis"
+trial=0
+experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
+# trial_experiment_files=os.path.join(data_dir,f"results/{experiment}_top5.joblib")
+
 
 
 classifier_embedding,test_embedding,train,test=joblib.load(experiment_file)
-
+# trial_embeddings,train,test=joblib.load(trial_experiment_files)
+# classifier_embedding,test_embedding=trial_embeddings[trial]
 train_ids=train['id'].unique()
 test_ids=test['id'].unique()
 classifier_embedding_reduced=np.stack(map(lambda id:classifier_embedding[train['id']==id,:].mean(axis=0) ,train_ids))
@@ -53,7 +57,7 @@ base_clf=LogisticRegression(
     penalty='l2',
     max_iter=1000,
     random_state=123,
-    solver='saga',
+    solver='lbfgs',
     class_weight='balanced')
 
 bagging=BaggingClassifier(base_estimator=base_clf,n_estimators=10,n_jobs=1,random_state=123)
@@ -88,9 +92,10 @@ pipeline = Pipeline([
     ('clf', bagging),
 ])
 
-clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=None,shuffle=False),
+clf = GridSearchCV(pipeline, param_grid=grid_parameters, cv=StratifiedKFold(10 ,random_state=123,shuffle=True),
                    verbose=1, n_jobs=-1,#n_iter=500,
-                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], refit='roc_auc',
+                   scoring=[ 'balanced_accuracy','roc_auc','f1', 'recall', 'precision'], 
+                   refit= 'roc_auc',
                    return_train_score=True,
                    )
 #  
@@ -129,7 +134,7 @@ specificity=report['0.0']['recall']
 acc=report['accuracy']
 auc=roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction'])
 save_table3(model="Contrastive",precision=precision,recall=recall,specificity=specificity,
-            auc=auc,details=experiment,other=json.dumps({'host':os.uname()[1],'f1':f1,
+            auc=auc,details=f"{experiment}{trial}",other=json.dumps({'host':os.uname()[1],'f1':f1,
                                                        'acc':acc}))
 
 joblib.dump(clf,weights_file)
