@@ -27,7 +27,7 @@ from utils import save_table3
 
 # rng=np.random.RandomState(123)
 cores=multiprocessing.cpu_count()-2
-trial=0
+# trial=0
 experiment="Contrastive-original-sample-DotProduct32"
 weights_file=os.path.join(weights_dir,f"Classification_{experiment}.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
@@ -134,7 +134,7 @@ specificity=report['0.0']['recall']
 acc=report['accuracy']
 auc=roc_auc_score(final_predictions2['admitted'],final_predictions2['prediction'])
 save_table3(model="Contrastive",precision=precision,recall=recall,specificity=specificity,
-            auc=auc,details=f"{experiment}{trial}",other=json.dumps({'host':os.uname()[1],'f1':f1,
+            auc=auc,details=f"{experiment}",other=json.dumps({'host':os.uname()[1],'f1':f1,
                                                        'acc':acc}))
 
 joblib.dump(clf,weights_file)

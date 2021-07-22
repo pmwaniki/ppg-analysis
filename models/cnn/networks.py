@@ -410,24 +410,18 @@ class EncoderRaw(nn.Module):
         self.base_model=base_model
         self.base_model.fc=nn.Identity()
         self.dropout=dropout
-
-
         num_features=base_model.out_features
-        # self.bn0 = nn.BatchNorm1d(num_features)
         self.fc0=nn.Linear(num_features,representation_size)
-        # self.bn1=nn.BatchNorm1d(256)
-        # self.dropout=nn.Dropout(p=dropout)
         self.relu=nn.ReLU(inplace=True)
         self.fc=nn.Linear(representation_size,num_classes)
 
-        # for m in self.modules():
-        #     if isinstance(m,nn.Linear):
-        #         nn.init.xavier_uniform_(m.weight)
-        #         nn.init.constant_(m.bias,0)
+        nn.init.xavier_uniform_(self.fc.weight)
+        nn.init.xavier_uniform_(self.fc0.weight)
+
+
 
     def forward(self,x):
         x=self.base_model(x)
-        # x=self.bn0(x)
         x=self.relu(x)
         x=F.dropout(x,p=self.dropout)
         x=self.fc0(x)
@@ -459,13 +453,6 @@ class MLP(nn.Module):
 
 
 
-# @torch.no_grad()
-# def concat_all_gather(tensor):
-#     tensors_gather=[torch.ones_like(tensor)
-#                    for _ in range(torch.distributed.get_world_size())]
-#     torch.distributed.all_gather(tensors_gather,tensor,async_op=False)
-#     output=torch.cat(tensors_gather,dim=0)
-#     return output
 
 
 

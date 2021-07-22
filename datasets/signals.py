@@ -16,8 +16,7 @@ def butter_filter(data,lowcut=0.1,highcut=5,fs=128,order=5):
     y=lfilter(b,a,data)
     return y
 
-def normalize(sig):
-    pass
+
 
 def stft(sig,fs,nperseg,noverlap,spec_only=False):
     f, t, Zxx = signal.stft(sig, fs=fs, window='hann', nperseg=nperseg, noverlap=noverlap, boundary=None)

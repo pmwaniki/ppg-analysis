@@ -1,8 +1,14 @@
 from torch.utils.data import Dataset
-import joblib
+# import joblib
 import numpy as np
 import torch
 from settings import segment_length, segment_slide
+import _pickle as pickle
+
+def load_file(filename):
+    with open(filename,'rb') as f:
+        data=pickle.load(f)
+    return data
 
 
 def normalize(x, mean=[0.3, 0.6], std=[0.09, 0.13]):
@@ -40,10 +46,13 @@ class TriageDataset(Dataset):
 
     def __getitem__(self, item):
         if self.sample_by:
-            row = self.data.loc[self.data[self.sample_by] == self.unique_ids[item], :].sample(1).iloc[0, :]
+            rows = self.data.loc[self.data[self.sample_by] == self.unique_ids[item], :].reset_index()
+            sampled_row=torch.randperm(rows.shape[0],).numpy()[0]
+            row=rows.iloc[sampled_row, :]
         else:
             row = self.data.iloc[item, :]
-        ppg = joblib.load(row['filename'])
+        # ppg = joblib.load(row['filename'])
+        ppg = load_file(row['filename'])
 
         red, infrared = np.array(ppg["red"]), np.array(ppg["infrared"])
 
@@ -97,23 +106,27 @@ class TriagePairs(Dataset):
         return len(self.ids)
 
     def __getitem__(self, item):
-        rows = self.data.loc[self.data[self.id_var] == self.ids[item], :]
-        sample_position = rows.sample(1)[self.position_var].values[0]
+        rows = self.data.loc[self.data[self.id_var] == self.ids[item], :].reset_index()
+        sampled_row = torch.randperm(rows.shape[0], ).numpy()[0]
+        sample_position = rows.iloc[sampled_row][self.position_var]
         if self.pretext == "augment":
             sample_position2 = sample_position
         elif self.pretext == "sample":
             rows2 = rows.loc[(rows[self.position_var] < (sample_position - self.position_distance)) | (
-                        rows[self.position_var] > (sample_position + self.position_distance))]
-            sample_position2 = rows2[self.position_var].sample(1).values[0]
+                        rows[self.position_var] > (sample_position + self.position_distance))].reset_index()
+            sampled_row2 = torch.randperm(rows2.shape[0] ).numpy()[0]
+            sample_position2 = rows2.iloc[sampled_row2][self.position_var]
         else:
             raise NotImplementedError(f"Pretext task {self.pretext} not implemented")
         sample_rows = rows.loc[rows[self.position_var].isin([sample_position, sample_position2])]
 
-        ppg1 = joblib.load(sample_rows.iloc[0]['filename'])
+        # ppg1 = joblib.load(sample_rows.iloc[0]['filename'])
+        ppg1 = load_file(sample_rows.iloc[0]['filename'])
         if self.pretext == "augment":
             ppg2 = ppg1
         elif self.pretext == "sample":
-            ppg2 = joblib.load(sample_rows.iloc[1]['filename'])
+            # ppg2 = joblib.load(sample_rows.iloc[1]['filename'])
+            ppg2 = load_file(sample_rows.iloc[1]['filename'])
 
         red1, infrared1 = ppg1["red"], ppg1["infrared"]
         red2, infrared2 = ppg2["red"], ppg2["infrared"]

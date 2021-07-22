@@ -8,26 +8,19 @@ from torchsummary import summary
 from settings import data_dir
 from settings import checkpoint_dir as log_dir
 import os
-from models.networks import init_fun
 from models.cnn.networks import resnet50_1d,EncoderRaw,wideresnet50_1d
-from models.cnn.wavenet2 import WaveNetModel
-from datasets.signals import stft,gaus_noise,rand_sfft,permute
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score,classification_report,roc_curve
+from datasets.signals import gaus_noise,permute
+
 from functools import partial
-from sklearn.decomposition import PCA
-from sklearn.model_selection import GridSearchCV,StratifiedKFold,RepeatedStratifiedKFold
-from sklearn.svm import SVC
+
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.spatial.distance import cosine
-import itertools
 from datasets.loaders import TriageDataset,TriagePairs
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from tqdm import tqdm
 from settings import weights_dir
 from pytorch_metric_learning import distances,regularizers,losses,testers
-from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 
 import ray
 # ray.init( num_cpus=12,dashboard_host="0.0.0.0")
@@ -42,10 +35,7 @@ import joblib
 display=os.environ.get('DISPLAY',None) is not None
 
 
-# enc_lr_=0.001
-# enc_l2_=5e-4
-# enc_l1_=0.001
-# dropout_=0.05
+
 include_sepsis=True
 enc_representation_size="32"
 res_type="original" # wide,original
@@ -53,18 +43,21 @@ enc_distance="DotProduct" #LpDistance Dotproduct Cosine
 distance_fun="euclidean" if enc_distance=="LpDistance" else cosine
 pretext="sample" #sample, augment
 experiment=f"Contrastive-{res_type}-{pretext}-{enc_distance}{enc_representation_size}"
+
 if include_sepsis: experiment = experiment + "-sepsis"
+weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}.pt")
 
 
-# weights_file=os.path.join(weights_dir,f"triplet_lr{enc_lr_}_l2{enc_l2_}_z{enc_representation_size}_x{enc_output_size}_bs{enc_batch_size}.pt")
-# details_=f"z{enc_representation_size}_l2{enc_l2_}_x{enc_output_size}_lr{enc_lr_}_bs{enc_batch_size}"
-#
 #
 if include_sepsis:
-    sepsis_segments=pd.read_csv(os.path.join(data_dir,"segments-sepsis.csv"))
+    sepsis_segments1=pd.read_csv(os.path.join(data_dir,"segments-sepsis.csv"))
+    sepsis_segments2 = pd.read_csv(os.path.join(data_dir, "segments-sepsis_0m.csv"))
+    sepsis_segments= pd.concat([sepsis_segments1,sepsis_segments2])
+
     sepsis_segments['id']=sepsis_segments['id'] + "-" + sepsis_segments['episode']
     non_repeated_ids = [k for k, v in sepsis_segments['id'].value_counts().items() if v <= 15]
     sepsis_segments = sepsis_segments[~sepsis_segments['id'].isin(non_repeated_ids)]
+
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
 triage_segments=pd.read_csv(os.path.join(data_dir,'triage/segments.csv'))
@@ -151,10 +144,10 @@ def get_loader(config):
 
     train_loader = DataLoader(train_ds,
                               batch_size=int(config["batch_size"]),
-                              shuffle=True, num_workers=20)
+                              shuffle=True, num_workers=10)
     val_loader = DataLoader(val_ds,
                             batch_size=int(config["batch_size"]),
-                            shuffle=False, num_workers=20)
+                            shuffle=False, num_workers=10)
     return train_loader,val_loader
 
 def get_model(config):
@@ -296,7 +289,7 @@ configs = {
 
 }
 
-config={i:v.sample() for i,v in configs.items()}
+# config={i:v.sample() for i,v in configs.items()}
 
 scheduler = ASHAScheduler(
         metric="loss",
@@ -339,22 +332,23 @@ result = tune.run(
     local_dir=log_dir,
     num_samples=500,
     name=experiment,
-    resume=False,
+    resume=True,
     scheduler=scheduler,
     progress_reporter=reporter,
     reuse_actors=False,
-    raise_on_failed_trial=False)
+    raise_on_failed_trial=False,)
 
 df = result.results_df
 df.to_csv(os.path.join(data_dir, f"results/hypersearch-{experiment}.csv"), index=False)
-best_trial = result.get_best_trial("loss", "min", "last")
-best_config=result.get_best_config('loss','min')
+metric='accuracy';mode='max'
+best_trial = result.get_best_trial(metric, mode, "last-5-avg")
+best_config=result.get_best_config(metric,mode,scope="last-5-avg")
 
 best_model=get_model(best_config)
 # best_trial=result.get_best_trial('loss','min')
-best_checkpoint=result.get_best_checkpoint(best_trial,'loss','min')
+best_checkpoint=result.get_best_checkpoint(best_trial,metric=metric,mode=mode)
 model_state,optimizer_state=torch.load(best_checkpoint)
-
+torch.save(model_state,weights_file)
 
 best_model.load_state_dict(model_state)
 best_model.to(device)
@@ -377,30 +371,30 @@ with torch.no_grad():
     accuracy = accuracy_fun(xis_embeddings, xjs_embeddings,distance=distance_fun)
     print(f"Accuracy: {accuracy}")
 
-    best_model.fc=nn.Identity()
-    best_model.eval()
+best_model.fc=nn.Identity()
+best_model.eval()
 
-    classifier_embedding=[]
-    with torch.no_grad():
-        for x1_raw in tqdm(classifier_train_loader):
-            x1_raw = x1_raw.to(device, dtype=torch.float)
-            xis = best_model( x1_raw)
-            xis=nn.functional.normalize(xis,dim=1)
-            classifier_embedding.append(xis.cpu().detach().numpy())
+classifier_embedding=[]
+with torch.no_grad():
+    for x1_raw in tqdm(classifier_train_loader):
+        x1_raw = x1_raw.to(device, dtype=torch.float)
+        xis = best_model( x1_raw)
+        xis=nn.functional.normalize(xis,dim=1)
+        classifier_embedding.append(xis.cpu().detach().numpy())
 
-    test_embedding=[]
-    with torch.no_grad():
-        for x1_raw in tqdm(classifier_test_loader):
-            x1_raw = x1_raw.to(device, dtype=torch.float)
-            xis = best_model( x1_raw)
-            xis = nn.functional.normalize(xis, dim=1)
-            test_embedding.append(xis.cpu().detach().numpy())
+test_embedding=[]
+with torch.no_grad():
+    for x1_raw in tqdm(classifier_test_loader):
+        x1_raw = x1_raw.to(device, dtype=torch.float)
+        xis = best_model( x1_raw)
+        xis = nn.functional.normalize(xis, dim=1)
+        test_embedding.append(xis.cpu().detach().numpy())
 
-    classifier_embedding=np.concatenate(classifier_embedding)
-    test_embedding=np.concatenate(test_embedding)
+classifier_embedding=np.concatenate(classifier_embedding)
+test_embedding=np.concatenate(test_embedding)
 
-    joblib.dump((classifier_embedding,test_embedding,train,test),
-                os.path.join(data_dir,f"results/{experiment}.joblib"))
+joblib.dump((classifier_embedding,test_embedding,train,test),
+            os.path.join(data_dir,f"results/{experiment}.joblib"))
 
 
 

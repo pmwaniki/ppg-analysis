@@ -22,7 +22,7 @@ from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,Randomize
 from sklearn.feature_selection import SelectKBest, f_regression,mutual_info_regression,SelectPercentile,VarianceThreshold
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from settings import data_dir,weights_dir
+from settings import data_dir,weights_dir,output_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from utils import save_table3
@@ -226,7 +226,7 @@ axs[2].text(0.05,0.9,f"r2={r2_spo2:.2f}\nrmse={rmse_spo2:.1f}",transform=axs[2].
 axs[2].set_ylabel("Observed")
 axs[2].set_xlabel("Predicted")
 axs[2].set_title("SPO2")
-
+plt.savefig(os.path.join(output_dir,f"Regression plots - {experiment}.png"))
 plt.show()
 
 

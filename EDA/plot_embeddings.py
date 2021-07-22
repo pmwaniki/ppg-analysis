@@ -19,11 +19,11 @@ from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,Randomize
 from sklearn.impute import SimpleImputer
 from sklearn.compose import TransformedTargetRegressor
 from sklearn import manifold
-from settings import data_dir
+from settings import data_dir,output_dir
 import itertools
 
 
-experiment="Contrastive-original-sample-DotProduct32-sepsis"
+experiment="Contrastive-original-sample-DotProduct32"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
@@ -143,7 +143,7 @@ X_tsne = tsne.fit_transform(subject_scl)
 
 fig, axs=plt.subplots(1,3,figsize=(12,4))
 
-# plot_embedding(X_tsne,subject_admitted,title="Admission",ax=axs[0][0])
+# plot_embedding(X_tsne,subject_admitted,title="Admission",)
 # # plt.show()
 
 # plot_embedding(X_tsne,subject_died,title="Death")
@@ -156,26 +156,27 @@ plot_embedding2(X_tsne,subject_hr,title="Heart rate",ax=axs[0])
 # plt.show()
 
 plot_embedding2(X_tsne,subject_spo2,title="SPO2",ax=axs[2])
+plt.savefig(os.path.join(output_dir,f"TSNE-{experiment}"))
 plt.show()
 
 # plot_embedding2(X_tsne,subject_hb,title="HB",cmap=cm.summer)
 # plt.show()
 
-fig,axs=plt.subplots(1,3,figsize=(15,10))
-for ax,vals in zip(axs.flatten(),itertools.combinations(range(3),2)):
-    r,c=vals
-    ax.scatter(X_tsne[subject_admitted == 0, r], X_tsne[subject_admitted == 0, c],
-                                          marker="o", label="No",
-                                          alpha=0.7)
-    ax.scatter(X_tsne[subject_admitted == 1, r], X_tsne[subject_admitted == 1, c],
-                                          marker="o", label="Yes",
-                                          alpha=0.7)
-    ax.set_xlabel(f"Component {r + 1}")
-    ax.set_ylabel(f"Component {c + 1}")
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-fig.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_tsne_{os.uname()[1]}_{experiment}.png")
-plt.show(block=False)
+# fig,axs=plt.subplots(1,3,figsize=(15,10))
+# for ax,vals in zip(axs.flatten(),itertools.combinations(range(3),2)):
+#     r,c=vals
+#     ax.scatter(X_tsne[subject_admitted == 0, r], X_tsne[subject_admitted == 0, c],
+#                                           marker="o", label="No",
+#                                           alpha=0.7)
+#     ax.scatter(X_tsne[subject_admitted == 1, r], X_tsne[subject_admitted == 1, c],
+#                                           marker="o", label="Yes",
+#                                           alpha=0.7)
+#     ax.set_xlabel(f"Component {r + 1}")
+#     ax.set_ylabel(f"Component {c + 1}")
+#     ax.set_xticks([])
+#     ax.set_yticks([])
+#
+# fig.savefig(f"/home/pmwaniki/Dropbox/tmp/contrastive_tsne_{os.uname()[1]}_{experiment}.png")
+# plt.show(block=False)
 
 ### PCA
