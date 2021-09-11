@@ -25,11 +25,12 @@ from sklearn.neighbors import KNeighborsRegressor
 from settings import data_dir,weights_dir,output_dir
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
-from utils import save_table3
+from utils import save_regression
 
 cores=multiprocessing.cpu_count()-2
-experiment="Contrastive-original-sample-DotProduct32-sepsis"
-weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
+# experiment="Contrastive-original-sample-DotProduct32-sepsis"
+experiment='PCA-32'
+# weights_file=os.path.join(weights_dir,f"Contrastive_{experiment}_svm.joblib")
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 dist_fun="euclidean" if "LpDistance" in experiment else scipy.spatial.distance.cosine
 
@@ -230,4 +231,11 @@ plt.savefig(os.path.join(output_dir,f"Regression plots - {experiment}.png"))
 plt.show()
 
 
+save_regression(model=experiment,rmse=rmse_hr,r2=r2_hr,details='heart rate',
+                other=json.dumps({k:v for k,v in hr_clf.best_params_.items() if k != "select__score_func"}))
 
+save_regression(model=experiment,rmse=rmse_rest_rate,r2=r2_rest_rate,details='respiratory rate',
+                other=json.dumps({k:v for k,v in resp_rate_clf.best_params_.items() if k != "select__score_func"}))
+
+save_regression(model=experiment,rmse=rmse_spo2,r2=r2_spo2,details='SpO2',
+                other=json.dumps({k:v for k,v in spo2_clf.best_params_.items() if k != "select__score_func"}))

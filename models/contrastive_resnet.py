@@ -282,7 +282,6 @@ configs = {
     'l2':tune.loguniform(0.000001,1.0),
     'lr_fc':tune.loguniform(0.00001,0.5),
     'l2_fc':tune.loguniform(0.000001,1.0),
-    # 'enc_l1':tune.loguniform(0.000001,0.05),
     'aug_gaus':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),
     'aug_num_seg':tune.choice([2,5,8,10]),
     'aug_prop_seg':tune.choice([0.0,0.2,0.5,0.8,1.0]) if pretext == "sample" else tune.choice([1.0,]),

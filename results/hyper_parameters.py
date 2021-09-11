@@ -24,6 +24,9 @@ end_to_end['init']=end_to_end['details'].map(lambda x:json.loads(x)['init'])
 experiment=f"Supervised2-{'original'}-{32}"
 experiments=end_to_end['init'].map(lambda x:experiment if x is None else f"{experiment}__{x}" )
 
+
+
+
 log_dirs=os.listdir(os.path.join(checkpoint_dir, "Supervised"))
 all_experiments={}
 for exp in experiments:
@@ -92,6 +95,7 @@ experiments=[e for e in experiments if e]
 
 # log_dirs=os.listdir(os.path.join(checkpoint_dir,))
 all_experiments={}
+best_configs={}
 for exp in experiments:
     analysis=Analysis(os.path.join(checkpoint_dir,exp))
     dfs=analysis.trial_dataframes
@@ -105,6 +109,7 @@ for exp in experiments:
     best_data = analysis.trial_dataframes[best_trial]
     best_config = analysis.get_best_config(score, mode)
     all_experiments[exp]=best_data
+    best_configs[exp]=best_config
 
 
 experiments_labels={'Contrastive-original-sample-DotProduct32-sepsis': 'Self-supervised: Labelled and Unlabelled',
@@ -146,3 +151,41 @@ plt.legend(handles,labels,bbox_to_anchor=(0.5, -0.05),
 # fig.legend()
 plt.savefig(os.path.join(output_dir,"SSL loss and accuracy trend.png"))
 if display: fig.show()
+
+ssl_hyperparameters=pd.DataFrame(best_configs).rename(columns=experiments_labels,
+                                                      index={'aug_gaus':"Proportion of signals with Gaussian noise augmentation",
+                                                             'aug_num_seg':"Number of slices",
+                                                             'aug_prop_seg':"Proportion of signals with signal slicing and permutation augmentation",
+                                                             'batch_size':"Batch size",
+                                                             'dropout':"Dropout proportion",
+                                                             'enc_output_size':"Encoder output size",
+                                                             'enc_temp':"NCE temperature",
+                                                             'l2':"L2 regularization parameter for convolutional layers",
+                                                             'l2_fc':"L2 regularization parameter for fully connected layers",
+                                                             'lr':"Learning rate for convolutional layers",
+                                                             'lr_fc':"Learning rate for fully connected layers",
+                                                             'representation_size':"Representation size"})
+
+ssl_hyperparameters.to_csv(os.path.join(output_dir,"SSL optimal hyper-parameters.csv"))
+
+supervised_hyperparameters=end_to_end.copy()
+supervised_hyperparameters['init2']=supervised_hyperparameters['init'].map({
+    'Contrastive-original-sample-DotProduct32-sepsis':"SSL: Labelled & Unlabelled",
+    'Contrastive-original-sample-DotProduct32':'SSL: Labelled',None:'Random'})
+supervised_hyperparameters={row['init2']:json.loads(row['others'])['config'] for i,row in supervised_hyperparameters.iterrows()}
+for key in ['lr','dropout','l2','l2_fc',]:
+    supervised_hyperparameters={k:{param:value for param,value in v} for k,v in supervised_hyperparameters.items()}
+
+supervised_hyperparameters=supervised_hyperparameters.rename(index={'dropout':"Dropout proportion",
+                                         'representation_size':'Representation size',
+                                         'batch_size':"Batch size",
+                                         'smoothing':"Label smothething parameter",
+                                         'lr':"Learning rate for convolutional layers",
+                                         'l2':"Weight decay parameter for convolutional layers",
+                                         'lr_fc':"Learning rate for fully connected layer",
+                                         'l2_fc':"Weight decay for fully connected layer",
+                                         'aug_gaus':"Proportion of segments with Gaussian augmentation",
+                                         'aug_num_seg':"Number of slices for signal slicing and permutation augmentation",
+                                         'aug_prop_seg':"Proportion of signals with slicing and permutation augmentation",
+                                         'max_iter':"Number of training iterations"})
+#supervised_hyperparameters.to_clipboard()
