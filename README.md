@@ -1,6 +1,6 @@
 # Analysis of PPG Signals using Self-Supervised Learning
 
-Self-supervised learning is used to extract features from raw PPG signals and initializing end-to-end deep learning models to predict hospitalization given raw PPG signals. Extracted features are used to predict hospitalization using logistic regression. We also relate extracted features to known physiological parameters such as respiratory rate, heart rate and oxygen saturation (SpO2) using linear regression.
+Self-supervised learning is used to extract features from raw PPG signals and initializing end-to-end deep learning models to predict hospitalization given raw PPG signals. Extracted features are used to predict hospitalization using logistic regression. We also relate extracted features to known physiological parameters such as respiratory rate, heart rate and oxygen saturation (SpO2) using linear regression. Details about the analysis can be found in this [manuscript](https://wellcomeopenresearch.org/articles/6-248/v1).
 
 
 The analysis is done using pytorch==1.7.1, pytorch-metric-learning==0.9.96, and hyper-parameter optimization using ray[tune]==1.2.0.
