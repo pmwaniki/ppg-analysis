@@ -4,9 +4,10 @@ import joblib
 import pandas as pd
 from pyro.infer import SVI, Trace_ELBO, Predictive
 from pyro.nn import PyroModule, PyroSample
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score,confusion_matrix,plot_confusion_matrix
 
 from sklearn.preprocessing import StandardScaler,PolynomialFeatures
+
 
 import torch
 import torch.nn as nn
@@ -17,6 +18,8 @@ import pyro.distributions as dist
 from settings import data_dir
 import os
 import matplotlib.pyplot as plt
+
+from utils import admission_confusion_matrix, admission_distplot
 
 experiment="Contrastive-original-sample-DotProduct32-sepsis"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
@@ -65,16 +68,15 @@ train_x=pd.get_dummies(train[predictors],drop_first=True)
 test_x=pd.get_dummies(test[predictors],drop_first=True)
 
 scl=StandardScaler()
-# x_data=scl.fit_transform(train_x)
-# x_data_test=scl.transform(test_x)
-# x_data=scl.fit_transform(classifier_embedding_reduced)
-# x_data_test=scl.transform(test_embedding_reduced)
-x_data=scl.fit_transform(np.concatenate([classifier_embedding_reduced,train_x],axis=1))
-x_data_test=scl.transform(np.concatenate([test_embedding_reduced,test_x],axis=1))
-poly=PolynomialFeatures(degree=1,include_bias=False)
-x_data=poly.fit_transform(x_data)
-x_data_test=poly.transform(x_data_test)
-x_data,x_data_test=torch.tensor(x_data,dtype=torch.float),torch.tensor(x_data_test,dtype=torch.float)
+x_data_clinical=torch.tensor(scl.fit_transform(train_x),dtype=torch.float)
+x_data_test_clinical=torch.tensor(scl.transform(test_x),dtype=torch.float)
+x_data_ppg=torch.tensor(scl.fit_transform(classifier_embedding_reduced),dtype=torch.float)
+x_data_test_ppg=torch.tensor(scl.transform(test_embedding_reduced),dtype=torch.float)
+# x_data=scl.fit_transform(np.concatenate([classifier_embedding_reduced,train_x],axis=1))
+# x_data_test=scl.transform(np.concatenate([test_embedding_reduced,test_x],axis=1))
+# poly=PolynomialFeatures(degree=1,include_bias=False)
+# x_data=poly.fit_transform(x_data)
+# x_data_test=poly.transform(x_data_test)
 
 y_data=torch.Tensor(admitted_train)
 
@@ -98,9 +100,17 @@ y_data=torch.Tensor(admitted_train)
 #         # y_pred = linear_model(obs_x)
 #         y_pred=alpha+obs_x@betas.reshape((-1,1))
 #         pyro.sample('y', dist.Bernoulli(logits=y_pred).to_event(1), obs=obs_y)
+# def mlp_block(infeatures,out_features,dim_hidden,activation=nn.LeakyReLU(0.2)):
+#     layers=[]
+#     sizes=[infeatures,] + dim_hidden + [out_features]
+#     for i,s in enumerate(sizes):
+#         if i==0:
+#             continue
+#         elif i<len(sizes-1):
+#             pass
 
 class BayesianMLP(PyroModule):
-    def __init__(self, in_features, out_features,dim_hidden=32):
+    def __init__(self, in_features, out_features=1,dim_hidden=64):
         super().__init__()
         self.linear1 = PyroModule[nn.Linear](in_features, dim_hidden)
         self.linear2 = PyroModule[nn.Linear](dim_hidden, out_features)
@@ -108,7 +118,7 @@ class BayesianMLP(PyroModule):
         self.linear1.bias = PyroSample(dist.Normal(0., 10.).expand([dim_hidden]).to_event(1))
         self.linear2.weight = PyroSample(dist.Normal(0., 1.).expand([out_features, dim_hidden]).to_event(2))
         self.linear2.bias = PyroSample(dist.Normal(0., 10.).expand([out_features]).to_event(1))
-        self.activation=nn.Softplus()
+        self.activation=nn.LeakyReLU(0.1)
 
     def forward(self, x, y=None):
         # sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
@@ -119,7 +129,7 @@ class BayesianMLP(PyroModule):
         return mean
 
 class BayesianRegression(PyroModule):
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features, out_features=1):
         super().__init__()
         self.linear = PyroModule[nn.Linear](in_features, out_features)
         self.linear.weight = PyroSample(dist.Normal(0., 1.).expand([out_features, in_features]).to_event(2))
@@ -127,35 +137,101 @@ class BayesianRegression(PyroModule):
 
     def forward(self, x, y=None):
         # sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
-        mean=pyro.deterministic('mean',value=self.linear(x).sigmoid().squeeze(-1))
+        mean=pyro.deterministic('mean',value=self.linear(x).sigmoid())
         with pyro.plate("data", x.shape[0]):
-            obs = pyro.sample("obs", dist.Bernoulli(mean), obs=y)
+            obs = pyro.sample("obs", dist.Bernoulli(mean).to_event(1), obs=y)
         return mean
-linear_model=BayesianMLP(in_features=x_data.shape[1],out_features=1)
+
+class BetaModel(PyroModule):
+    def __init__(self, in_features):
+        super().__init__()
+        self.linear_alpha = PyroModule[nn.Linear](in_features, 1)
+        # self.linear_alpha.weight = PyroSample(dist.Normal(0., 1.).expand([1, in_features]).to_event(2))
+        # self.linear_alpha.bias = PyroSample(dist.Normal(0., 10.).expand([1]).to_event(1))
+        self.linear_beta = PyroModule[nn.Linear](in_features, 1)
+        # self.linear_beta.weight = PyroSample(dist.Normal(0., 1.).expand([1, in_features]).to_event(2))
+        # self.linear_beta.bias = PyroSample(dist.Normal(0., 10.).expand([1]).to_event(1))
+        self.activation=torch.exp
+
+    def forward(self, x, y=None):
+        # sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+        alpha=self.activation(self.linear_alpha(x))
+        beta=self.activation(self.linear_beta(x))
+
+        # mean=pyro.deterministic('mean',value=self.linear(x).sigmoid().squeeze(-1))
+        with pyro.plate("data", x.shape[0]):
+            mean = pyro.sample('mean', dist.Beta(concentration0=alpha, concentration1=beta).to_event(1))
+            obs = pyro.sample("obs", dist.Bernoulli(mean).to_event(1), obs=y)
+        return mean
+
+model_clinical=BayesianRegression(in_features=x_data_clinical.shape[1],)
 # linear_guide=pyro.infer.autoguide.AutoDiagonalNormal(linear_model)
-linear_guide=pyro.infer.autoguide.AutoMultivariateNormal(linear_model)
+guide_clinical=pyro.infer.autoguide.AutoMultivariateNormal(model_clinical)
 # def null_guide(obs_x,obs_y):
 #     pass
 
-adam = pyro.optim.Adam({"lr": 0.0001})
-svi = SVI(linear_model, linear_guide, adam, loss=Trace_ELBO())
+adam_clinical = pyro.optim.Adam({"lr": 0.0001})
+svi_clinical = SVI(model_clinical, guide_clinical, adam_clinical, loss=Trace_ELBO())
 
 pyro.clear_param_store()
 for j in range(100000):
     # calculate the loss and take a gradient step
-    loss = svi.step(x_data, y_data)
+    loss = svi_clinical.step(x_data_clinical, y_data.reshape(-1,1))
     if j % 1000 == 0:
-        print("[iteration %04d] loss: %.4f" % (j + 1, loss / len(x_data)))
+        print("[iteration %04d] loss: %.4f" % (j + 1, loss / len(x_data_clinical)))
 
 
-predictive = Predictive(linear_model, guide=linear_guide, num_samples=1000,
+predictive_clinical = Predictive(model_clinical, guide=guide_clinical, num_samples=1000,
                         return_sites=( "obs",'mean'),)
-samples = predictive(x_data_test ,)
-test_pred=samples['mean'].mean(dim=0).reshape(-1).numpy()
-roc_auc_score(admitted_test,test_pred)
+samples_clinical = predictive_clinical(x_data_test_clinical ,)
+test_pred_clinical=samples_clinical['mean'].mean(dim=0).reshape(-1).numpy()
+roc_auc_score(admitted_test,test_pred_clinical)
 
-plt.hist(samples['mean'][100])
-plt.show()
-# with torch.no_grad():
-#     test_pred=linear_model(x_data_test).cpu().numpy().reshape(-1)
 
+base_rate=admitted_train.mean()
+pred_positive_clinical=(test_pred_clinical>base_rate)*1.0
+admission_confusion_matrix(admitted_test,pred_positive_clinical)
+
+admission_distplot(samples_clinical['mean'],admitted_test,pred_positive_clinical)
+
+
+model_ppg=BayesianRegression(in_features=x_data_ppg.shape[1],)
+# linear_guide=pyro.infer.autoguide.AutoDiagonalNormal(linear_model)
+guide_ppg=pyro.infer.autoguide.AutoMultivariateNormal(model_ppg)
+# def null_guide(obs_x,obs_y):
+#     pass
+
+adam_ppg = pyro.optim.Adam({"lr": 0.0001})
+svi_ppg = SVI(model_ppg, guide_ppg, adam_ppg, loss=Trace_ELBO())
+
+pyro.clear_param_store()
+for j in range(100000):
+    # calculate the loss and take a gradient step
+    loss = svi_ppg.step(x_data_ppg, y_data.reshape(-1,1))
+    if j % 1000 == 0:
+        print("[iteration %04d] loss: %.4f" % (j + 1, loss / len(x_data_ppg)))
+
+
+predictive_ppg = Predictive(model_ppg, guide=guide_ppg, num_samples=1000,
+                        return_sites=( "obs",'mean'),)
+samples_ppg = predictive_ppg(x_data_test_ppg ,)
+test_pred_ppg=samples_ppg['mean'].mean(dim=0).reshape(-1).numpy()
+roc_auc_score(admitted_test,test_pred_ppg)
+
+
+base_rate=admitted_train.mean()
+pred_positive_ppg=(test_pred_ppg>base_rate)*1.0
+admission_confusion_matrix(admitted_test,pred_positive_ppg)
+
+admission_distplot(samples_ppg['mean'],admitted_test,pred_positive_ppg)
+
+samples_both=np.concatenate([samples_clinical['mean'],samples_ppg['mean']],axis=0)
+test_pred_both=samples_both.mean(axis=0).reshape(-1)
+roc_auc_score(admitted_test,test_pred_both)
+
+
+base_rate=admitted_train.mean()
+pred_positive_both=(test_pred_both>base_rate)*1.0
+admission_confusion_matrix(admitted_test,pred_positive_both)
+
+admission_distplot(samples_both,admitted_test,pred_positive_both)
