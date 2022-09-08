@@ -123,9 +123,9 @@ class BayesianMLP(PyroModule):
     def forward(self, x, y=None):
         # sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
         out=self.activation(self.linear1(x))
-        mean=pyro.deterministic('mean',value=self.linear2(out).sigmoid().squeeze(-1))
+        mean=pyro.deterministic('mean',value=self.linear2(out).sigmoid())
         with pyro.plate("data", x.shape[0]):
-            obs = pyro.sample("obs", dist.Bernoulli(mean), obs=y)
+            obs = pyro.sample("obs", dist.Bernoulli(mean).to_event(1), obs=y)
         return mean
 
 class BayesianRegression(PyroModule):
@@ -164,7 +164,7 @@ class BetaModel(PyroModule):
             obs = pyro.sample("obs", dist.Bernoulli(mean).to_event(1), obs=y)
         return mean
 
-model_clinical=BayesianRegression(in_features=x_data_clinical.shape[1],)
+model_clinical=BayesianMLP(in_features=x_data_clinical.shape[1],)
 # linear_guide=pyro.infer.autoguide.AutoDiagonalNormal(linear_model)
 guide_clinical=pyro.infer.autoguide.AutoMultivariateNormal(model_clinical)
 # def null_guide(obs_x,obs_y):
@@ -195,7 +195,7 @@ admission_confusion_matrix(admitted_test,pred_positive_clinical)
 admission_distplot(samples_clinical['mean'],admitted_test,pred_positive_clinical)
 
 
-model_ppg=BayesianRegression(in_features=x_data_ppg.shape[1],)
+model_ppg=BayesianMLP(in_features=x_data_ppg.shape[1],)
 # linear_guide=pyro.infer.autoguide.AutoDiagonalNormal(linear_model)
 guide_ppg=pyro.infer.autoguide.AutoMultivariateNormal(model_ppg)
 # def null_guide(obs_x,obs_y):
