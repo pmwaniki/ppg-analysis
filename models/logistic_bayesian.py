@@ -145,7 +145,7 @@ class SpikeSlab(PyroModule):
 
 
 class SpikeSlabMLP(PyroModule):
-    def __init__(self, in_features,dim_layers=[16,8,4,1]):
+    def __init__(self, in_features,dim_layers=[128,1]):
         super().__init__()
         module_list=[]
         for i,l in enumerate(dim_layers):
@@ -205,7 +205,7 @@ guide_ppg.append(pyro.infer.autoguide.AutoDelta(pyro.poutine.block(model_ppg,exp
 # guide_ppg.to(device)
 
 adam_ppg = pyro.optim.Adam({"lr": 0.001,'betas':(0.9,0.999)})
-svi_ppg = SVI(model_ppg, guide_ppg, adam_ppg, loss=Trace_ELBO(num_particles=5))
+svi_ppg = SVI(model_ppg, guide_ppg, adam_ppg, loss=Trace_ELBO(num_particles=2))
 
 pyro.clear_param_store()
 loss_=[]
@@ -238,7 +238,7 @@ admission_confusion_matrix(admitted_test,pred_positive_ppg)
 
 displot_ppg=admission_distplot(samples_ppg['mean'].squeeze(),admitted_test,pred_positive_ppg)
 
-
+raise Exception("Pause ... ")
 # def guide_spike_slab(x, y=None):
 #     P = x.shape[1]
 #     prior_p = pyro.param('prior_p', torch.tensor([0.5]).expand([P]), constraint=constraints.unit_interval)
