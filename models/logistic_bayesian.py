@@ -92,8 +92,8 @@ x_data_test_clinical=torch.tensor(preprocess.transform(test_x),dtype=torch.float
 x_data_ppg=torch.tensor(preprocess.fit_transform(classifier_embedding_reduced),dtype=torch.float)
 x_data_test_ppg=torch.tensor(preprocess.transform(test_embedding_reduced),dtype=torch.float)
 
-x_data_concat=torch.concat([x_data_clinical,x_data_ppg],dim=1)
-x_data_test_concat=torch.concat([x_data_test_clinical,x_data_test_ppg],dim=1)
+x_data_concat=torch.cat([x_data_clinical,x_data_ppg],dim=1)
+x_data_test_concat=torch.cat([x_data_test_clinical,x_data_test_ppg],dim=1)
 # x_data=scl.fit_transform(np.concatenate([classifier_embedding_reduced,train_x],axis=1))
 # x_data_test=scl.transform(np.concatenate([test_embedding_reduced,test_x],axis=1))
 # poly=PolynomialFeatures(degree=1,include_bias=False)
