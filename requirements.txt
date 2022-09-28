@@ -75,6 +75,6 @@ torchvision==0.8.2
 tornado @ file:///tmp/build/80754af9/tornado_1606942300299/work
 tqdm @ file:///tmp/build/80754af9/tqdm_1611857934208/work
 typing-extensions @ file:///home/ktietz/src/ci_mi/typing_extensions_1612808209620/work
-urllib3==1.26.3
+urllib3==1.26.5
 Werkzeug==1.0.1
 yarl==1.6.3
