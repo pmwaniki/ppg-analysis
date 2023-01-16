@@ -348,8 +348,8 @@ print("AUC concatinated_clinical ", roc_auc_score(admitted_test, test_pred_conca
 
 base_rate = admitted_train.mean()
 pred_positive_concat_clinical = (test_pred_concat_clinical > base_rate) * 1.0
-admission_confusion_matrix(admitted_test, pred_positive_concat_clinical)
-
+confussion_concat_clinical=admission_confusion_matrix(admitted_test, pred_positive_concat_clinical)
+confussion_concat_clinical.savefig(os.path.join(output_dir, f"Confusion matrix concat_clinical - {experiment}.png"))
 distplot_concat_clinical = admission_distplot(samples_concat_clinical['mean'].squeeze().cpu(), admitted_test,
                                               pred_positive_concat_clinical)
 distplot_concat_clinical.savefig(os.path.join(output_dir, f'Density plots - concat_clinical {experiment}.png'))
