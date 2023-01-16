@@ -4,77 +4,104 @@ aiohttp-cors==0.7.0
 aioredis==1.3.1
 async-timeout==3.0.1
 attrs==20.3.0
+backcall==0.2.0
+beautifulsoup4==4.9.3
 blessings==1.7
-cachetools==4.2.1
+cachetools==4.2.0
 certifi==2020.12.5
+cffi @ file:///tmp/build/80754af9/cffi_1606255081583/work
 chardet==3.0.4
 click==7.1.2
 colorama==0.4.4
 colorful==0.5.4
 cycler==0.10.0
-faiss==1.7.0
+decorator==4.4.2
+et-xmlfile==1.1.0
+faiss==1.6.4
 filelock==3.0.12
-google-api-core==1.26.0
-google-auth==1.27.0
+google==3.0.0
+google-api-core==1.23.0
+google-auth==1.24.0
 google-auth-oauthlib==0.4.2
 googleapis-common-protos==1.52.0
 gpustat==0.6.0
-grpcio==1.35.0
+grpcio==1.34.0
 hiredis==1.1.0
 idna==2.10
-joblib==1.0.1
+ipykernel @ file:///tmp/build/80754af9/ipykernel_1596207638929/work/dist/ipykernel-5.3.4-py3-none-any.whl
+ipython @ file:///tmp/build/80754af9/ipython_1604101197014/work
+ipython-genutils @ file:///tmp/build/80754af9/ipython_genutils_1606773439826/work
+jedi==0.17.0
+joblib @ file:///tmp/build/80754af9/joblib_1601912903842/work
 jsonschema==3.2.0
-kiwisolver @ file:///tmp/build/80754af9/kiwisolver_1612282420641/work
+jupyter-client @ file:///tmp/build/80754af9/jupyter_client_1601311786391/work
+jupyter-core @ file:///tmp/build/80754af9/jupyter_core_1606148996965/work
+kiwisolver @ file:///tmp/build/80754af9/kiwisolver_1604014535162/work
 Markdown==3.3.3
-matplotlib @ file:///tmp/build/80754af9/matplotlib-suite_1613407855456/work
+matplotlib @ file:///tmp/build/80754af9/matplotlib-base_1603378225747/work
 mkl-fft==1.2.0
 mkl-random==1.1.1
 mkl-service==2.3.0
-msgpack==1.0.2
+msgpack==1.0.1
 multidict==5.1.0
 numpy @ file:///tmp/build/80754af9/numpy_and_numpy_base_1603570489231/work
 nvidia-ml-py3==7.352.0
 oauthlib==3.1.0
 olefile==0.46
-opencensus==0.7.12
+opencensus==0.7.11
 opencensus-context==0.1.2
-packaging==20.9
-pandas==1.2.2
-Pillow @ file:///tmp/build/80754af9/pillow_1609786786540/work
+openpyxl==3.0.10
+opt-einsum==3.3.0
+pandas @ file:///tmp/build/80754af9/pandas_1602088120436/work
+parso @ file:///tmp/build/80754af9/parso_1607623074025/work
+pexpect @ file:///tmp/build/80754af9/pexpect_1605563209008/work
+pickleshare @ file:///tmp/build/80754af9/pickleshare_1606932040724/work
+Pillow @ file:///tmp/build/80754af9/pillow_1603822255246/work
 prometheus-client==0.9.0
+prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1602688806899/work
 protobuf==3.14.0
-psutil==5.8.0
-py-spy==0.3.4
+psutil==5.7.3
+ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1605560620615/work/dist/ptyprocess-0.6.0-py2.py3-none-any.whl
+py-spy==0.3.3
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
-pymongo==3.11.3
-pyparsing @ file:///home/linux1/recipes/ci/pyparsing_1610983426697/work
+pycparser @ file:///tmp/build/80754af9/pycparser_1594388511720/work
+Pygments @ file:///tmp/build/80754af9/pygments_1607368905949/work
+pymongo==3.11.2
+pyparsing==2.4.7
+pyro-api==0.1.2
+pyro-ppl==1.8.2
 pyrsistent==0.17.3
-python-dateutil @ file:///home/ktietz/src/ci/python-dateutil_1611928101742/work
-pytorch-metric-learning==0.9.96
-pytz==2021.1
-PyYAML==5.4.1
+python-dateutil==2.8.1
+pytorch-metric-learning==0.9.95
+pytz @ file:///tmp/build/80754af9/pytz_1606604771399/work
+PyYAML==5.3.1
+pyzmq==20.0.0
 ray==1.2.0
 redis==3.5.3
-requests==2.25.1
+requests==2.25.0
 requests-oauthlib==1.3.0
-rsa==4.7.1
-scikit-learn==0.24.1
-scipy==1.6.1
+rsa==4.6
+scikit-learn @ file:///tmp/build/80754af9/scikit-learn_1598376899566/work
+scipy @ file:///tmp/build/80754af9/scipy_1597686649129/work
+seaborn==0.12.0
 sip==4.19.13
 six @ file:///tmp/build/80754af9/six_1605205327372/work
-tabulate==0.8.8
-tensorboard==2.4.1
-tensorboard-plugin-wit==1.8.0
+soupsieve==2.1
+tabulate==0.8.7
+tensorboard==2.4.0
+tensorboard-plugin-wit==1.7.0
 tensorboardX==2.1
-threadpoolctl==2.1.0
-torch==1.7.1
-torchaudio==0.7.0a0+a853dff
+threadpoolctl @ file:///tmp/tmp9twdgx9k/threadpoolctl-2.1.0-py3-none-any.whl
+torch==1.12.1
 torchsummary==1.5.1
 torchvision==0.8.2
 tornado @ file:///tmp/build/80754af9/tornado_1606942300299/work
-tqdm @ file:///tmp/build/80754af9/tqdm_1611857934208/work
-typing-extensions @ file:///home/ktietz/src/ci_mi/typing_extensions_1612808209620/work
-urllib3==1.26.3
+tqdm @ file:///tmp/build/80754af9/tqdm_1607369919789/work
+traitlets @ file:///tmp/build/80754af9/traitlets_1602787416690/work
+typing-extensions @ file:///tmp/build/80754af9/typing_extensions_1598376058250/work
+urllib3==1.26.2
+wcwidth @ file:///tmp/build/80754af9/wcwidth_1593447189090/work
 Werkzeug==1.0.1
+XlsxWriter==3.0.3
 yarl==1.6.3
