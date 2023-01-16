@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import offsetbox
 import os
 import sys
@@ -10,20 +11,13 @@ import pandas as pd
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,QuantileTransformer
-from sklearn.metrics import roc_auc_score, classification_report,r2_score,mean_squared_error
-from sklearn.linear_model import LogisticRegression,LinearRegression
-from sklearn.svm import SVC,SVR
-from sklearn.ensemble import RandomForestRegressor,GradientBoostingRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV,KFold,StratifiedKFold,RandomizedSearchCV
-from sklearn.impute import SimpleImputer
-from sklearn.compose import TransformedTargetRegressor
+
 from sklearn import manifold
 from settings import data_dir,output_dir
 import itertools
 
-
 experiment="Contrastive-original-sample-DotProduct32"
+# experiment="Contrastive-original-sample-DotProduct32-sepsis"
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
 data=pd.read_csv(os.path.join(data_dir,"triage/data.csv"))
@@ -63,6 +57,7 @@ subject_died=np.array(subject_died)
 subject_resp_rate=np.array(subject_resp_rate)
 
 subject_spo2=np.array(subject_spo2); subject_spo2[subject_spo2<65]=np.nan
+subject_spo2_transformed=QuantileTransformer(n_quantiles=100,output_distribution='normal').fit_transform(subject_spo2.reshape(-1,1)).reshape(-1)
 subject_hb=np.array(subject_hb)
 subject_hr=np.array(subject_hr)
 
@@ -137,8 +132,31 @@ def plot_embedding2(X,y=None, title=None,cmap=cm.hot,ax=None):
     if title is not None:
         ax.set_title(title)
 
+def plot_embedding2_3d(X,y=None, title=None,cmap=cm.hot,ax=None,rotation=(20,-120)):
+    x_min, x_max = np.min(X, 0), np.max(X, 0)
+    X = (X - x_min) / (x_max - x_min)
+    X=X[~np.isnan(y),:]
+    y=y[~np.isnan(y)]
 
-tsne = manifold.TSNE(n_components=2, init='pca', random_state=0,perplexity=100,learning_rate=100)
+    if ax is None:
+        plt.figure()
+        ax = plt.subplot(111,projection='3d')
+    for i in range(X.shape[0]):
+        ax.scatter(X[i, 0], X[i, 1],X[i,2],
+                    color=cmap((y[i]-np.nanmin(y))/(np.nanmax(y)-np.nanmin(y))),
+                    # color=cm.hot(y[i]),
+                    alpha=0.5,)
+    ax.view_init(*rotation)
+    ax.set_xlabel("Component 1")
+    ax.set_ylabel("Component 2")
+    ax.set_zlabel("Component 3")
+
+    ax.set_xticks([]), ax.set_yticks([]),ax.set_zticks([])
+    # # plt.legend()
+    if title is not None:
+        ax.set_title(title)
+
+tsne = manifold.TSNE(n_components=3, init='pca', random_state=0,perplexity=30,learning_rate=100)
 X_tsne = tsne.fit_transform(subject_scl)
 
 fig, axs=plt.subplots(1,3,figsize=(12,4))
@@ -157,6 +175,14 @@ plot_embedding2(X_tsne,subject_hr,title="Heart rate",ax=axs[0])
 
 plot_embedding2(X_tsne,subject_spo2,title="SPO2",ax=axs[2])
 plt.savefig(os.path.join(output_dir,f"TSNE-{experiment}"))
+plt.show()
+
+rotation=(30,-170)
+fig, axs=plt.subplots(1,3,figsize=(12,4),subplot_kw=dict(projection='3d'))
+plot_embedding2_3d(X_tsne,subject_resp_rate,title="Respiratory rate",ax=axs[1],rotation=rotation)
+plot_embedding2_3d(X_tsne,subject_hr,title="Heart rate",ax=axs[0],rotation=rotation)
+plot_embedding2_3d(X_tsne,subject_spo2,title="SPO2",ax=axs[2],rotation=rotation)
+plt.savefig(os.path.join(output_dir,f"TSNE-3d-{experiment}"))
 plt.show()
 
 # plot_embedding2(X_tsne,subject_hb,title="HB",cmap=cm.summer)
