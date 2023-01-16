@@ -28,8 +28,8 @@ pyro.set_rng_seed(0)
 device='cpu'
 num_chains=1
 polynomial_degree=2
-experiment="Contrastive-original-sample-DotProduct32-sepsis"
-# experiment="Contrastive-original-sample-DotProduct32"
+# experiment="Contrastive-original-sample-DotProduct32-sepsis"
+experiment="Contrastive-original-sample-DotProduct32"
 # experiment='PCA-32'
 experiment_file=os.path.join(data_dir,f"results/{experiment}.joblib")
 
@@ -232,7 +232,7 @@ axs[1].scatter(test_pred_resp,y_test_resp,)
 axs[1].plot([20,100],[20,100],'r--')
 axs[1].text(0.05,0.9,f"r2={r2_rest_rate:.2f}\nrmse={rmse_rest_rate:.1f}",transform=axs[1].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
-axs[1].set_ylabel("Observed")
+# axs[1].set_ylabel("Observed")
 axs[1].set_xlabel("Predicted")
 axs[1].set_title("Respiratory rate")
 
@@ -240,7 +240,7 @@ axs[2].scatter(test_pred_spo2,y_test_spo2,)
 axs[2].plot([80,100],[80,100],'r--')
 axs[2].text(0.05,0.9,f"r2={r2_spo2:.2f}\nrmse={rmse_spo2:.1f}",transform=axs[2].transAxes,
             bbox={'boxstyle':"round",'facecolor':"wheat",'alpha':0.5})
-axs[2].set_ylabel("Observed")
+# axs[2].set_ylabel("Observed")
 axs[2].set_xlabel("Predicted")
 axs[2].set_title("SPO2")
 plt.savefig(os.path.join(output_dir,f"Regression plots Bayesian - {experiment}.png"))
