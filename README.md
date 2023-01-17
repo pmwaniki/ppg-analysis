@@ -12,15 +12,15 @@ Install packages in *requirements.txt*
 - Prepare data by runing *datasets/segments.py*. The datasets can be requested from https://doi.org/10.7910/DVN/KQ4DNK, https://doi.org/10.5683/SP2/PHX4C5, and https://doi.org/10.5683/SP2/ZDDFZL
 
 ## Self supervised learning
-Self-supervised learning model are trained using contrastive learning (*contrastive_resnet.py*) using Noise Contrastive Estimation loss and dot product as the distance metric.
+Self-supervised learning model are trained using contrastive learning (*models/contrastive_resnet.py*) using Noise Contrastive Estimation loss and dot product as the distance metric.
 
 ## Regression models
-Features extracted using contrastive learning are used as predictors of heart rate, respiratory rate and oxygen saturation (SpO2) in *regression.py* and *regression_bayesian.py*.
+Features extracted using contrastive learning are used as predictors of heart rate, respiratory rate and oxygen saturation (SpO2) in *models/regression.py* and *models/regression_bayesian.py*.
 
 ## Classification models
-Classification of hospitalization using features extracted using self-supervised learning: *admission_classifier.py* and *bayesian_logistic.py*
+Classification of hospitalization using features extracted using self-supervised learning: *models/admission_classifier.py* and *models/logistic_bayesian.py*
 
-Classification of hospitalization using end-to-end deep learning:*end_to_end.py*
+Classification of hospitalization using end-to-end deep learning:*models/end_to_end.py*
 
 
 End to end models can either be initialized randomly or using weights of the self-supervised model
